@@ -121,50 +121,86 @@ def _git_provenance() -> tuple[str, bool]:
 class Board:
     def __init__(self, port: str, baud: int, timeout: float):
         import serial  # type: ignore
+        self._serial_module = serial
+        self._serial_exception = serial.SerialException
+        self.port = port
+        self.baud = baud
+        self.timeout = timeout
+        self.sequence = 1
+        self.reconnects = 0
+        self.parser = FrameParser(max_payload=117)
+        self._open()
+
+    def _open(self) -> None:
+        serial = self._serial_module
         self.serial = serial.Serial(
-            port=port, baudrate=baud, bytesize=serial.EIGHTBITS,
+            port=self.port, baudrate=self.baud, bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
             timeout=0.01, write_timeout=1.0,
         )
-        self.timeout = timeout
-        self.sequence = 1
+
+    def _reconnect(self) -> None:
+        # FTDI/WinUSB can transiently reject WriteFile after a long run.  A
+        # bounded reopen fixes the driver state without hiding a persistent
+        # transport fault; the caller still reports the second failure.
+        self.serial.close()
+        time.sleep(0.05)
         self.parser = FrameParser(max_payload=117)
+        self._open()
+        self.reconnects += 1
 
     def close(self) -> None:
         self.serial.close()
 
     def decode(self, syndrome: np.ndarray) -> dict[str, int | float | bool]:
         sequence = self.sequence
-        self.sequence = 1 if sequence == 0xFFFF else sequence + 1
-        request = encode_frame(Frame(COMMAND, sequence, _pack_groups(syndrome)))
+        payload = _pack_groups(syndrome)
         start = time.perf_counter_ns()
-        self.serial.write(request)
-        self.serial.flush()
-        deadline = time.monotonic() + self.timeout
-        while time.monotonic() < deadline:
-            chunk = self.serial.read(max(1, self.serial.in_waiting))
-            if not chunk:
-                continue
-            for frame in self.parser.feed(chunk):
-                if frame.sequence != sequence:
+        last_sequence = sequence
+        for attempt in range(2):
+            if attempt:
+                self._reconnect()
+                sequence = 1 if sequence == 0xFFFF else sequence + 1
+            last_sequence = sequence
+            request = encode_frame(Frame(COMMAND, sequence, payload))
+            try:
+                self.serial.write(request)
+                self.serial.flush()
+                deadline = time.monotonic() + self.timeout
+                while time.monotonic() < deadline:
+                    chunk = self.serial.read(max(1, self.serial.in_waiting))
+                    if not chunk:
+                        continue
+                    for frame in self.parser.feed(chunk):
+                        if frame.sequence != sequence:
+                            continue
+                        if frame.command != (COMMAND | 0x80):
+                            raise RuntimeError(
+                                f"unexpected response command 0x{frame.command:02x}"
+                            )
+                        if len(frame.payload) != 11:
+                            raise RuntimeError(
+                                f"unexpected response length {len(frame.payload)}"
+                            )
+                        status = frame.payload[0]
+                        self.sequence = 1 if sequence == 0xFFFF else sequence + 1
+                        return {
+                            "success": bool(status & 0x01),
+                            "deferred": bool(status & 0x02),
+                            "error": bool(status & 0x04),
+                            "basis_id": frame.payload[10],
+                            "profile": frame.payload[1] & 0x07,
+                            "logical": (frame.payload[2] & 0x0F) | (frame.payload[3] << 4),
+                            "cycles": int.from_bytes(frame.payload[4:8], "little"),
+                            "sweeps": int.from_bytes(frame.payload[8:10], "little"),
+                            "wall_ns": time.perf_counter_ns() - start,
+                        }
+                raise TimeoutError(f"timeout waiting for sequence {sequence}")
+            except (self._serial_exception, TimeoutError):
+                if attempt == 0:
                     continue
-                if frame.command != (COMMAND | 0x80):
-                    raise RuntimeError(f"unexpected response command 0x{frame.command:02x}")
-                if len(frame.payload) != 11:
-                    raise RuntimeError(f"unexpected response length {len(frame.payload)}")
-                status = frame.payload[0]
-                return {
-                    "success": bool(status & 0x01),
-                    "deferred": bool(status & 0x02),
-                    "error": bool(status & 0x04),
-                    "basis_id": frame.payload[10],
-                    "profile": frame.payload[1] & 0x07,
-                    "logical": (frame.payload[2] & 0x0F) | (frame.payload[3] << 4),
-                    "cycles": int.from_bytes(frame.payload[4:8], "little"),
-                    "sweeps": int.from_bytes(frame.payload[8:10], "little"),
-                    "wall_ns": time.perf_counter_ns() - start,
-                }
-        raise TimeoutError(f"timeout waiting for sequence {sequence}")
+                raise
+        raise TimeoutError(f"transport retry exhausted at sequence {last_sequence}")
 
 
 def _args() -> argparse.Namespace:
@@ -557,6 +593,7 @@ def main() -> int:
         "profile_histogram": dict(sorted(profiles.items())),
         "parser_crc_errors": board.parser.crc_errors,
         "parser_format_errors": board.parser.format_errors,
+        "serial_reconnects": board.reconnects,
         "failure_cases": failures,
         "deferred_corpus": (
             str(args.deferred_corpus.resolve()) if args.deferred_corpus else None
