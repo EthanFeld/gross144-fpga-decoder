@@ -12,37 +12,33 @@ alternate-clock, and Open975 paths are not release interfaces.
 
 Target: `p = 0.2%`, block LER `<= 1e-5`, mean endpoint latency `<= 1 ms`.
 
-| Board capture | Shots | Endpoint failures | Point LER | One-sided 95% upper bound | FPGA mean | Endpoint mean |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| X post-flash | 20,000 | 0 | 0 | `1.4978e-4` | `996.89 us` | `3.488 ms` |
-| X clean capture | 50,000 | 0 | 0 | `5.9913e-5` | `993.76 us` | `3.515 ms` |
+| Board capture | Shots | Endpoint failures | Point LER | One-sided 95% upper bound | FPGA mean | Endpoint mean | C tail mean |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| X release candidate | 20,000 | 0 | 0 | `1.4978e-4` | `1.255 ms` | `2.642 ms` | `27.3 ms` |
+| Z release candidate | 20,000 | 0 | 0 | `1.4978e-4` | `1.235 ms` | `2.791 ms` | `32.0 ms` |
 
-The 50,000-shot run is functional evidence, not an LER pass: its statistical
-upper bound is still above `1e-5`. Endpoint latency is dominated by the CPU
-tail; the measured CPU-handoff mean was about `50.0 ms` in that capture.
+These runs are functional evidence, not an LER pass: their statistical upper
+bound is still above `1e-5`. Endpoint latency is dominated by the CPU tail.
 
 Paper comparison numbers supplied for this target:
 
 | Metric | Paper reference | Current board evidence |
 | --- | ---: | ---: |
-| Block LER | `1.9e-6` | `<= 5.9913e-5` upper bound at 50k shots |
+| Block LER | `1.9e-6` | `<= 1.4978e-4` upper bound at 20k/basis |
 | LER / syndrome-extraction round | `1.6e-7` | not established on board |
 | LER / round / logical qubit | `1.3e-8` | not established on board |
 
-The 300,000-shot proof remains open: long runs entered a crash/cascade, and
-the earlier completed run had five audited logical mismatches. Do not present
-the current sample as paper-scale LER proof.
+The 300,000-shot proof remains open. Do not present the current sample as
+paper-scale LER proof.
 
 ## Build status
 
-The table below records historical basis-specific builds. The current 40.5 MHz
-build is intentionally blocked until the pinned Relay fixture is restored;
-the build wrapper rejects stale ROM provenance.
+Current basis-specific build/timing proofs:
 
-| Basis | Logic | BSRAM | Bitstream SHA-256 |
-| --- | ---: | ---: | --- |
-| X | 19,735/20,736 (96%) | 39/46 (85%) | `52ED2718D6693816452AFF05FED3BAC02E32BC9BBBF0C4D4417887D91D7BC7A6` |
-| Z | 19,434/20,736 (94%) | 39/46 (85%) | `7911D08258EB4E87C01A533999B3E3205FACBE0381B27D34062C712D931BAF25` |
+| Basis | Requested clock | Achieved Fmax | Setup / hold slack | Bitstream SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| X | 40.500 MHz | 45.353 MHz | `+2.642 / +0.091 ns` | `5AF52453BE02E5486085A2355181440E6E57B6DD9716A73FEBD918B1A993639C` |
+| Z | 40.500 MHz | 44.559 MHz | `+2.249 / +0.219 ns` | `B043D695EFC3F7EDAA46E4CA709EC98034865111EF24E84C0E782023B0A68B5E` |
 
 Clock source of truth: [`config/board_clock.json`](config/board_clock.json).
 The prior 51 MHz image had negative setup slack; current production target is
@@ -138,9 +134,9 @@ and long serial min-selection cones.
 | Full configured S1 cap | 120 | 84 | 30.0% |
 | Modeled four-bank primary rate at 45 MHz | 1,016/s | 3,049/s | 3.0x |
 
-Status: cycle reductions are validated in RTL/model work; the board headline
-comes from historical 51 MHz captures and reports roughly 994 us FPGA mean
-core time. The current build target is 40.5 MHz.
+Status: cycle reductions are validated in RTL/model work; current 40.5 MHz
+board captures report 1.235–1.255 ms FPGA mean core time. The prior 51 MHz
+captures are retained only as historical comparison.
 
 ### 7. Compressed streamed S2 working set
 
@@ -186,8 +182,9 @@ fallback behavior to one persistent C worker. The worker uses a quotient image,
 cached gamma tables, no Python/NumPy allocation in its hot loop, a 32-set fast
 pass, bounded 240-set fallback, and a four-candidate portfolio.
 
-Status: `Production`, but not yet fast enough for the endpoint gate: the
-50,000-shot board capture measured about 50 ms mean CPU handoff.
+Status: `Production`. The default fast-first C tail is equivalence-clean on
+1,016 X and 973 Z hardware-deferred syndromes; current 20k board means are
+27.3 ms (X) and 32.0 ms (Z) per deferred handoff.
 
 ## Current architecture
 
@@ -245,9 +242,8 @@ python tools/profile_c_tail.py --basis both --shots 1000 `
   --set-iterations 50 --output build\c_tail_profile.json
 ```
 
-Current focused validation: `58 passed, 16 skipped, 12 subtests passed`.
-Icarus compile and Verilator lint pass; the recorded X/Z Gowin build results
-are summarized above. The authoritative board evidence and failure audit are
+Current focused validation: `74 passed, 12 subtests passed`; forced RTL error
+recovery passes. The authoritative board evidence and failure audit are
 in
 [`reports/HEADLINE_BENCHMARKS.md`](reports/HEADLINE_BENCHMARKS.md).
 

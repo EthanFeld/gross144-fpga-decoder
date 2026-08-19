@@ -1,9 +1,8 @@
 # Board endpoint evidence
 
-Updated: 2026-08-18. Target: Gross144 at `p=0.2%`, Tang Nano 20K,
-historical 51 MHz FPGA captures, 3 Mbaud UART, resident C Relay-lite tail.
-The current release clock source is config/board_clock.json at 40.5 MHz;
-historical captures must not be reinterpreted at the new clock.
+Updated: 2026-08-19. Target: Gross144 at `p=0.2%`, Tang Nano 20K,
+40.5 MHz timing-clean FPGA clock, 3 Mbaud UART, resident C Relay-lite tail.
+Both basis images were built and SRAM-flashed on the connected GW2AR-18C.
 
 ## Stopping gates
 
@@ -11,8 +10,8 @@ historical captures must not be reinterpreted at the new clock.
 | --- | ---: | --- |
 | Endpoint block LER | `<= 1e-5` | not proven |
 | Mean endpoint core latency | `<= 1 ms` | not met; CPU tail dominates |
-| FPGA mean core latency | `<= 1 ms` | met in clean captures |
-| Board proof | large-shot, no crash/state loss | open |
+| FPGA mean core latency | `<= 1 ms` | not met at 40.5 MHz: 1.235–1.255 ms |
+| Board proof | large-shot, no crash/state loss | 20k/basis clean; 300k open |
 
 ## Clean board captures
 
@@ -20,26 +19,30 @@ All captures below used SRAM programming, COM6, 3 Mbaud, and the production
 fast-handoff architecture. A zero-failure sample is functional evidence, not a
 statistical LER pass; the one-sided 95% upper bound is the release statistic.
 
-| Artifact | Shots | Endpoint failures | Point LER | One-sided 95% upper | FPGA mean core | Endpoint mean core |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 20,000-shot post-flash capture | 20,000 | 0 | 0 | `1.4978e-4` | `996.89 us` | `3.488 ms` |
-| 50,000-shot capture | 50,000 | 0 | 0 | `5.9913e-5` | `993.76 us` | `3.515 ms` |
+| Artifact | Shots | Endpoint failures | Point LER | One-sided 95% upper | FPGA mean core | Endpoint mean core | C tail mean |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| X release candidate | 20,000 | 0 | 0 | `1.4978e-4` | `1.255 ms` | `2.642 ms` | `27.3 ms` |
+| Z release candidate | 20,000 | 0 | 0 | `1.4978e-4` | `1.235 ms` | `2.791 ms` | `32.0 ms` |
 
 The raw capture JSON is generated output and is intentionally omitted from
 the portfolio tree; the measured values and statistical bounds above are the
 checked-in release record.
 
-The clean 50,000-shot run had no live FPGA failures, transport errors, or CPU
-tail errors. Its endpoint gate remains red because the confidence bound is
-above `1e-5` and the mean endpoint latency is above `1 ms`.
+Both runs had zero parser, transport, decoder, or endpoint failures. The
+endpoint gate remains red because the confidence bound is above `1e-5` and
+the mean endpoint latency is above `1 ms`.
+
+The default `FAST_FIRST` C-tail shortcut was compared with the conservative
+portfolio on 1,016 X and 973 Z real FPGA-deferred syndromes: zero acceptance,
+syndrome, or logical mismatches. Check-node OpenMP parallelism was verified on
+the same corpus; measured C-tail speedups were 3.09x (X) and 2.68x (Z).
 
 ## Long-run incident and failure audit
 
-Two 300,000-shot attempts entered a repeatable cascade after a long clean
-prefix: immediate low-cycle failures and rapidly increasing failure count.
-The run was stopped after an unrelated crash/state-loss event, so no final
-300,000-shot JSON is valid proof. The surviving prefix is useful bring-up
-evidence only.
+The prior 300,000-shot attempts entered a repeatable cascade after a long
+clean prefix. The current explicit `S_ERROR` recovery and basis/image guard
+must be exercised by a fresh 300,000-shot campaign; no 300,000-shot JSON is
+currently valid proof.
 
 The earlier completed 300,000-shot capture contained five board-only logical
 mismatches. Exact saved-case replay classified them as follows:
@@ -72,8 +75,9 @@ tail status, to make the remaining incident reproducible.
                        endpoint word
 ```
 
-The host tail is pinned to C. It uses a 32-set fast pass, a bounded 240-set
-fallback for ambiguous cases, and a four-leg portfolio. No auto backend,
+The host tail is pinned to C. It uses a verified config-0 fast-first pass, a
+32-set fast pass, a bounded 240-set fallback for ambiguous cases, and a
+four-leg conservative portfolio for audit/A-B mode. No auto backend,
 vectorized fallback, native Relay wheel, or alternate WSL worker is allowed in
 the release path.
 
@@ -86,19 +90,16 @@ The canonical build, SRAM flash, smoke, and proof wrappers are now checked in:
 - `tools/run_board_proof.ps1`
 - `tools/gowin_paper_gross144_s1w_four_lane_uart.tcl`
 
-Both basis builds were rerun after the cleanup. Gowin completed synthesis,
-place-and-route, timing analysis, and bitstream generation for the exact
-production closure:
+Both basis builds completed synthesis, place-and-route, timing analysis, and
+bitstream generation. The build rejects negative setup/hold slack:
 
-| Basis | Logic | BSRAM | Bitstream SHA-256 |
-| --- | ---: | ---: | --- |
-| X | 19,735/20,736 (96%) | 39/46 (85%) | `52ED2718D6693816452AFF05FED3BAC02E32BC9BBBF0C4D4417887D91D7BC7A6` |
-| Z | 19,434/20,736 (94%) | 39/46 (85%) | `7911D08258EB4E87C01A533999B3E3205FACBE0381B27D34062C712D931BAF25` |
+| Basis | Requested clock | Achieved Fmax | Setup slack | Hold slack | Bitstream SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| X | 40.500 MHz | 45.353 MHz | `+2.642 ns` | `+0.091 ns` | `5AF52453BE02E5486085A2355181440E6E57B6DD9716A73FEBD918B1A993639C` |
+| Z | 40.500 MHz | 44.559 MHz | `+2.249 ns` | `+0.219 ns` | `B043D695EFC3F7EDAA46E4CA709EC98034865111EF24E84C0E782023B0A68B5E` |
 
-These are historical build proofs, not current release artifacts: neither
-image was flashed in this cleanup turn. The current 40.5 MHz target cannot be
-rebuilt until the pinned Relay fixture is restored; the build now rejects the
-stale tracked ROM manifest instead of silently reusing it.
+Gowin reports a `PR1014` generic-routing warning for the 27 MHz input clock;
+post-route setup/hold timing passes at the requested 40.5 MHz.
 
 Legacy source families were removed from the release tree. Approximate file
 count reduction from the pre-cleanup inventory is:
