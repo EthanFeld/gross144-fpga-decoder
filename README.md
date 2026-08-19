@@ -14,22 +14,25 @@ Target: `p = 0.2%`, block LER `<= 1e-5`, mean endpoint latency `<= 1 ms`.
 
 | Board capture | Shots | Endpoint failures | Point LER | One-sided 95% upper bound | FPGA mean | Endpoint mean | C tail mean |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| X release candidate | 20,000 | 0 | 0 | `1.4978e-4` | `1.255 ms` | `2.642 ms` | `27.3 ms` |
-| Z release candidate | 20,000 | 0 | 0 | `1.4978e-4` | `1.235 ms` | `2.791 ms` | `32.0 ms` |
+| X release candidate | 30,000 | 0 | 0 | `9.9853e-5` | `1.221 ms` | `2.687 ms` | `34.24 ms` |
+| Z release candidate | 30,000 | 0 | 0 | `9.9853e-5` | `1.205 ms` | `2.574 ms` | `32.17 ms` |
 
 These runs are functional evidence, not an LER pass: their statistical upper
 bound is still above `1e-5`. Endpoint latency is dominated by the CPU tail.
+Both 30,000-shot runs were clean: no endpoint, transport, parser, or decoder
+errors; all 2,562 FPGA defers were accepted by the C tail.
 
 Paper comparison numbers supplied for this target:
 
 | Metric | Paper reference | Current board evidence |
 | --- | ---: | ---: |
-| Block LER | `1.9e-6` | `<= 1.4978e-4` upper bound at 20k/basis |
+| Block LER | `1.9e-6` | `<= 9.9853e-5` upper bound at 30k/basis |
 | LER / syndrome-extraction round | `1.6e-7` | not established on board |
 | LER / round / logical qubit | `1.3e-8` | not established on board |
 
 The 300,000-shot proof remains open. Do not present the current sample as
-paper-scale LER proof.
+paper-scale LER proof. The endpoint latency gate also remains open because
+the resident CPU tail raises the mean above 1 ms.
 
 ## Build status
 
@@ -37,8 +40,8 @@ Current basis-specific build/timing proofs:
 
 | Basis | Requested clock | Achieved Fmax | Setup / hold slack | Bitstream SHA-256 |
 | --- | ---: | ---: | ---: | --- |
-| X | 40.500 MHz | 45.353 MHz | `+2.642 / +0.091 ns` | `5AF52453BE02E5486085A2355181440E6E57B6DD9716A73FEBD918B1A993639C` |
-| Z | 40.500 MHz | 44.559 MHz | `+2.249 / +0.219 ns` | `B043D695EFC3F7EDAA46E4CA709EC98034865111EF24E84C0E782023B0A68B5E` |
+| X | 40.500 MHz | 40.533 MHz | `+0.020 / +0.202 ns` | `A875EACBB244F9CA9A4408C28545E51BAD5B522DC090F083A2742E9E73E28303` |
+| Z | 40.500 MHz | 41.445 MHz | `+0.563 / +0.077 ns` | `A74BBA39F7E5CBC2C51A75834FCEA8F06D7C4E994E9CD9A307C0C3CCBE96FFB8` |
 
 Clock source of truth: [`config/board_clock.json`](config/board_clock.json).
 The prior 51 MHz image had negative setup slack; current production target is
