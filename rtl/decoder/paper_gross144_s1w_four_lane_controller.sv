@@ -3328,8 +3328,21 @@ module paper_gross144_s1w_four_lane_controller #(
                                 state <= S_VERIFY_SETUP;
                             end else if (verify_time_ordinal == 12 && verify_group_ordinal == 17) begin
                                 if (!verify_failed &&
-                                    (verify_parity_after == syndrome_read_bits))
+                                    (verify_parity_after == syndrome_read_bits) &&
+                                    !(RISK_DEFER_FINAL_SWEEP &&
+                                      (sweep_reg + 1'b1 >= profile_max_sweeps)))
                                     state <= S_LOGICAL_SETUP;
+                                else if (!verify_failed &&
+                                         (verify_parity_after == syndrome_read_bits) &&
+                                         RISK_DEFER_FINAL_SWEEP &&
+                                         (sweep_reg + 1'b1 >= profile_max_sweeps)) begin
+                                    // Exact syndrome satisfaction is necessary
+                                    // but not sufficient for logical quality at
+                                    // the bounded terminal budget. Hand final
+                                    // candidates to resident CPU telescope.
+                                    deferred <= 1'b1; success <= 1'b0;
+                                    profile_used <= profile_reg; state <= S_DONE;
+                                end
                                 else if (RELAY_MODE && !relay_phase_reg) begin
                                     // A phase-0 hash collision: phase 1 is
                                     // still required before spending another
