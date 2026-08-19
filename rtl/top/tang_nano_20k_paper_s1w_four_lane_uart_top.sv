@@ -393,7 +393,11 @@ module tang_nano_20k_paper_s1w_four_lane_uart_top #(
         .TEMPLATE_SLOT1_FILE("images/template_slot1.memb"),
         .TEMPLATE_SLOT2_FILE("images/template_slot2.memb"),
         .TEMPLATE_SLOT3_FILE("images/template_slot3.memb"),
-        .FORCE_EXACT_REPLAY(0),
+        // Inline emit parity is a diagnostic fast reject, not a final
+        // syndrome proof: it sees edge-update signs, while acceptance needs
+        // final variable signs.  Force streamed exact replay before logical
+        // projection so hash collisions cannot become false accepts.
+        .FORCE_EXACT_REPLAY(1),
         .INLINE_EXACT_CHECK(1),
         .EXACT_VERIFY_INTERVAL(1),
         .HASH_ONLY_ACCEPT(0),

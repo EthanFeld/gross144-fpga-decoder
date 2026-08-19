@@ -42,9 +42,9 @@ module paper_gross144_s1w_four_lane_controller #(
     // rescue profiles to one sweep; the resident CPU owns those cases.
     // Maximum primary-profile sweeps in the bounded FPGA fast path.
     parameter integer FAST_MAX_SWEEPS = 10,
-    // Production handoff images never enter the serial exact verifier. Keep
-    // the live bank mapper on the schedule-coordinate registers directly;
-    // the general/debug image retains the verify-coordinate mux.
+    // Common-path handoff keeps live mapping on schedule coordinates. The
+    // certified top also enters streamed exact replay; verify reads select
+    // their registered verify coordinates below.
     parameter integer FAST_HANDOFF = 0,
     // Native DPB read data is valid one edge after issue. Keep a selectable
     // tag pipeline for board bring-up; depth 1 removes avoidable verify/run
@@ -52,9 +52,9 @@ module paper_gross144_s1w_four_lane_controller #(
     parameter integer READ_RESPONSE_STAGES = 1,
     // Separate logical-read settle depth for native-DPB board bring-up.
     parameter integer LOGICAL_READ_RESPONSE_STAGES = 1,
-    // Exact per-check parity accumulated from final emit posteriors. This
-    // removes serial 936-check replay while retaining deterministic syndrome
-    // acceptance; FORCE_EXACT_REPLAY remains fallback/diagnostic.
+    // Emit-time parity is a fast reject/diagnostic. It is not final syndrome
+    // proof because edge-update signs can repeat variables. Certified images
+    // use FORCE_EXACT_REPLAY for acceptance.
     parameter integer INLINE_EXACT_CHECK = 1,
     // Exact replay is the acceptance oracle. Replaying every sweep is
     // redundant: retain candidate state, verify every Nth sweep, and always
@@ -734,38 +734,37 @@ module paper_gross144_s1w_four_lane_controller #(
     );
 
     logic [27:0] map_coordinates;
-    wire [6:0] map_coordinate0 = FAST_HANDOFF ? active_schedule_coordinate0 :
-        ((state == S_VERIFY_RUN) ? active_verify_coordinate0 : active_schedule_coordinate0);
-    wire [6:0] map_coordinate1 = FAST_HANDOFF ? active_schedule_coordinate1 :
-        ((state == S_VERIFY_RUN) ? active_verify_coordinate1 : active_schedule_coordinate1);
-    wire [6:0] map_coordinate2 = FAST_HANDOFF ? active_schedule_coordinate2 :
-        ((state == S_VERIFY_RUN) ? active_verify_coordinate2 : active_schedule_coordinate2);
-    wire [6:0] map_coordinate3 = FAST_HANDOFF ? active_schedule_coordinate3 :
-        ((state == S_VERIFY_RUN) ? active_verify_coordinate3 : active_schedule_coordinate3);
+    // FAST_HANDOFF skips verify-coordinate muxing only when no exact replay
+    // exists.  Production now forces replay; stale final-sweep coordinates
+    // would otherwise make every verify read the same four checks.
+    wire [6:0] map_coordinate0 = (state == S_VERIFY_RUN) ? active_verify_coordinate0 :
+        active_schedule_coordinate0;
+    wire [6:0] map_coordinate1 = (state == S_VERIFY_RUN) ? active_verify_coordinate1 :
+        active_schedule_coordinate1;
+    wire [6:0] map_coordinate2 = (state == S_VERIFY_RUN) ? active_verify_coordinate2 :
+        active_schedule_coordinate2;
+    wire [6:0] map_coordinate3 = (state == S_VERIFY_RUN) ? active_verify_coordinate3 :
+        active_schedule_coordinate3;
     // Separate mux cones for the live scalar mapper.  Keeping these as
     // independent named nets avoids the vendor's packed conditional-net
     // commoning that aliases odd lanes during placement.
     (* syn_keep = 1 *) logic [6:0] physical_map_coordinate0, physical_map_coordinate1;
     (* syn_keep = 1 *) logic [6:0] physical_map_coordinate2, physical_map_coordinate3;
     always_comb begin
-        physical_map_coordinate0 = FAST_HANDOFF ? active_schedule_coordinate0 :
-                                    ((state == S_VERIFY_RUN) ?
-                                     active_verify_coordinate0 : active_schedule_coordinate0);
+        physical_map_coordinate0 = (state == S_VERIFY_RUN) ?
+                                    active_verify_coordinate0 : active_schedule_coordinate0;
     end
     always_comb begin
-        physical_map_coordinate1 = FAST_HANDOFF ? active_schedule_coordinate1 :
-                                    ((state == S_VERIFY_RUN) ?
-                                     active_verify_coordinate1 : active_schedule_coordinate1);
+        physical_map_coordinate1 = (state == S_VERIFY_RUN) ?
+                                    active_verify_coordinate1 : active_schedule_coordinate1;
     end
     always_comb begin
-        physical_map_coordinate2 = FAST_HANDOFF ? active_schedule_coordinate2 :
-                                    ((state == S_VERIFY_RUN) ?
-                                     active_verify_coordinate2 : active_schedule_coordinate2);
+        physical_map_coordinate2 = (state == S_VERIFY_RUN) ?
+                                    active_verify_coordinate2 : active_schedule_coordinate2;
     end
     always_comb begin
-        physical_map_coordinate3 = FAST_HANDOFF ? active_schedule_coordinate3 :
-                                    ((state == S_VERIFY_RUN) ?
-                                     active_verify_coordinate3 : active_schedule_coordinate3);
+        physical_map_coordinate3 = (state == S_VERIFY_RUN) ?
+                                    active_verify_coordinate3 : active_schedule_coordinate3;
     end
     logic [22:0] descriptor [0:3];
     logic [HASH_WIDTH-1:0] descriptor_hash [0:3];
