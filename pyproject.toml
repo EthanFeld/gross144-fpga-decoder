@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools==75.8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mitten-qldpc"
+version = "0.1.0"
+description = "MITTEN qLDPC decoder reference models and Tang Nano 20K RTL"
+requires-python = ">=3.11"
+dependencies = ["numpy>=2.0", "scipy>=1.14", "stim==1.16.0", "networkx>=3.6", "ldpc==2.4.1"]
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+
+[tool.setuptools.packages.find]
+where = ["python"]

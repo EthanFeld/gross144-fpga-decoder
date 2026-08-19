@@ -1,0 +1,11 @@
+{
+  "board": "Tang Nano 20K GW2AR-18C",
+  "input_clock_hz": 27000000,
+  "core_clock_hz": 40500000,
+  "uart_baud": 3000000,
+  "pll": {
+    "idiv_sel": 7,
+    "fbdiv_sel": 11,
+    "odiv_sel": 16
+  }
+}

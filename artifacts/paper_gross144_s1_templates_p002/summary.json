@@ -1,0 +1,71 @@
+{
+  "basis": {
+    "X": {
+      "checks": 936,
+      "cycle_plan": {
+        "clock_hz": 45000000.0,
+        "cycles_per_window": 264384,
+        "microseconds_per_syndrome_round": 489.59999999999997,
+        "minsum_cycles_per_pass": 17712,
+        "minsum_iterations": 6,
+        "syndrome_rounds_per_second": 2042.483660130719,
+        "warmup_cycles_per_pass": 79056,
+        "warmup_iterations": 2
+      },
+      "edges": 30672,
+      "image_sha256": "a2ba0a14e529a60569b34a70f90fd02287b5e07b468ef2dc428e465410b5e21c",
+      "max_four_bank_beats": 9,
+      "max_template_degree": 35,
+      "storage_plan": {
+        "address_bits": 14,
+        "compressed_check_record_bits": 43776,
+        "compressed_record_bram_blocks": 3,
+        "explicit_topology_bits": 429408,
+        "posterior_bits": 96624,
+        "posterior_bram_blocks": 8,
+        "template_bram_blocks": 1,
+        "template_topology_bits": 9694,
+        "topology_compression_ratio": 44.29626573138024,
+        "total_decoder_bram_blocks": 24,
+        "warmup_message_bits": 153360,
+        "warmup_message_bram_blocks": 12
+      },
+      "variables": 8784
+    },
+    "Z": {
+      "checks": 936,
+      "cycle_plan": {
+        "clock_hz": 45000000.0,
+        "cycles_per_window": 264384,
+        "microseconds_per_syndrome_round": 489.59999999999997,
+        "minsum_cycles_per_pass": 17712,
+        "minsum_iterations": 6,
+        "syndrome_rounds_per_second": 2042.483660130719,
+        "warmup_cycles_per_pass": 79056,
+        "warmup_iterations": 2
+      },
+      "edges": 30672,
+      "image_sha256": "96f9f855c1556beb49b7dce0ddbff76e2635bb2d3e6574b7a879fc723abf9acd",
+      "max_four_bank_beats": 9,
+      "max_template_degree": 35,
+      "storage_plan": {
+        "address_bits": 14,
+        "compressed_check_record_bits": 43776,
+        "compressed_record_bram_blocks": 3,
+        "explicit_topology_bits": 429408,
+        "posterior_bits": 96624,
+        "posterior_bram_blocks": 8,
+        "template_bram_blocks": 1,
+        "template_topology_bits": 9694,
+        "topology_compression_ratio": 44.29626573138024,
+        "total_decoder_bram_blocks": 24,
+        "warmup_message_bits": 153360,
+        "warmup_message_bram_blocks": 12
+      },
+      "variables": 8784
+    }
+  },
+  "p": 0.002,
+  "relay_root": "external-relay-fixture",
+  "schema": "PAPER_GROSS144_S1_QUOTIENT_IMAGE_V1"
+}
