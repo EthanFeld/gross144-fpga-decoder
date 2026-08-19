@@ -578,6 +578,10 @@ static Result run_relay_lite_range(const Image *im, const uint8_t *target,
              iteration <= (set == 0 ? g_relay_lite_pre : g_relay_lite_set_iters);
              ++iteration) {
             int use_prior_v2c = set != 0 && iteration == 1;
+            // Check nodes are independent within a layered iteration. Keep
+            // each check's edge order unchanged, but expose the whole pass
+            // to OpenMP; the old serial pass dominated the resident tail.
+#pragma omp parallel for schedule(static)
             for (uint32_t c = 0; c < im->checks; ++c) {
                 uint16_t first = UINT16_MAX, second = UINT16_MAX, count = 0;
                 uint8_t parity = 0;
@@ -599,6 +603,9 @@ static Result run_relay_lite_range(const Image *im, const uint8_t *target,
                 s->first[c] = first; s->second[c] = second;
                 s->first_count[c] = count; s->parity[c] = parity;
             }
+            // Each check owns a disjoint CSR edge range, so message writes
+            // are race-free and preserve the exact update equations.
+#pragma omp parallel for schedule(static)
             for (uint32_t c = 0; c < im->checks; ++c) {
                 uint16_t first = s->first[c], second = s->second[c];
                 uint16_t count = s->first_count[c];
@@ -712,6 +719,10 @@ static Result run_config(const Image *im, const uint8_t *target,
     const int32_t divisor = 1 << cfg->memory_weight_shift;
     init_state(im, cfg, s);
     for (uint32_t iteration = 1; iteration <= cfg->max_iterations; ++iteration) {
+        // Relay check-node passes have the same independent ownership as the
+        // fixed-point portfolio above. Parallelize without changing ordering
+        // inside any check or its edge range.
+#pragma omp parallel for schedule(static)
         for (uint32_t c = 0; c < im->checks; ++c) {
             uint16_t first = UINT16_MAX, second = UINT16_MAX, count = 0;
             uint8_t parity = 0;
@@ -728,6 +739,9 @@ static Result run_config(const Image *im, const uint8_t *target,
             s->first[c] = first; s->second[c] = second;
             s->first_count[c] = count; s->parity[c] = parity;
         }
+        // Message writes remain disjoint because each edge belongs to one
+        // check row in the immutable CSR image.
+#pragma omp parallel for schedule(static)
         for (uint32_t c = 0; c < im->checks; ++c) {
             uint16_t first = s->first[c], second = s->second[c];
             uint16_t count = s->first_count[c];

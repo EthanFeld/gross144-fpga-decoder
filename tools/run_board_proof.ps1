@@ -3,8 +3,10 @@ param(
     [ValidateSet('X', 'Z')] [string]$Basis = 'X',
     [int]$Shots = 300000,
     [string]$Bitstream,
+    [string]$DeferredCorpus,
     [string]$Output,
-    [switch]$Smoke
+    [switch]$Smoke,
+    [switch]$FastFirst
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,10 +21,12 @@ if ([string]::IsNullOrWhiteSpace($Output)) {
 }
 if ([string]::IsNullOrWhiteSpace($Bitstream)) {
     $project = "paper_gross144_s1w_four_lane_uart_production_$($Basis.ToLower())"
-    $Bitstream = Get-ChildItem -LiteralPath (Join-Path $root "build\$project") `
+    $bitstreamFile = Get-ChildItem -LiteralPath (Join-Path $root "build\$project") `
         -Recurse -Filter "$project.fs" -File | Select-Object -First 1
-    if ($null -eq $Bitstream) { throw "No production bitstream. Run tools/build_board.ps1 -Basis $Basis" }
-    $Bitstream = $Bitstream.FullName
+    if ($null -eq $bitstreamFile) { throw "No production bitstream. Run tools/build_board.ps1 -Basis $Basis" }
+    # Force a plain string. Passing a FileInfo through a native-style Python
+    # argument array can collapse to an empty value on Windows PowerShell.
+    $Bitstream = $bitstreamFile.FullName.ToString()
 } elseif (-not [IO.Path]::IsPathRooted($Bitstream)) {
     $Bitstream = Join-Path $root $Bitstream
 }
@@ -34,6 +38,13 @@ $arguments = @(
     '--bitstream', $Bitstream, '--cpu-telescope-handoff',
     '--cpu-backend', 'c', '--output', $Output
 )
+if (-not [string]::IsNullOrWhiteSpace($DeferredCorpus)) {
+    if (-not [IO.Path]::IsPathRooted($DeferredCorpus)) {
+        $DeferredCorpus = Join-Path $root $DeferredCorpus
+    }
+    $arguments += @('--deferred-corpus', $DeferredCorpus)
+}
+if ($FastFirst) { $arguments += '--fast-first' }
 if ($Smoke) { $arguments += '--smoke' }
 Push-Location $root
 try {

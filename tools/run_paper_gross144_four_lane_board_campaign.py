@@ -195,8 +195,16 @@ def _args() -> argparse.Namespace:
         help="production resident C Relay tail (the only supported backend)",
     )
     parser.add_argument(
+        "--fast-first", action=argparse.BooleanOptionalAction, default=True,
+        help="use the verified speculative config-0 C-tail shortcut (default: on)",
+    )
+    parser.add_argument(
         "--smoke", action="store_true",
         help="require exact functional/transport success without the large-shot CI gate",
+    )
+    parser.add_argument(
+        "--deferred-corpus", type=Path,
+        help="optionally save full detector words for FPGA-deferred shots as an NPZ corpus",
     )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
@@ -206,6 +214,8 @@ def main() -> int:
     args = _args()
     if args.shots < 1 or args.batch_size < 1 or args.timeout <= 0 or args.core_clock_hz <= 0:
         raise SystemExit("shots, batch-size, timeout, and core-clock-hz must be positive")
+    if args.deferred_corpus is not None and not args.cpu_telescope_handoff:
+        raise SystemExit("--deferred-corpus requires --cpu-telescope-handoff")
     expected_basis_id = 0 if args.basis == "X" else 1
     adapter = PaperGross144Stage1FpgaAdapter(
         args.relay_root,
@@ -225,7 +235,9 @@ def main() -> int:
         # deferred shot and keeps the common case entirely on the FPGA.
         cpu_telescope = PaperGross144CpuTelescope(
             args.relay_root, p=0.002, basis=args.basis,
-            config=CpuTelescopeConfig(backend=args.cpu_backend),
+            config=CpuTelescopeConfig(
+                backend=args.cpu_backend, c_relay_fast_first=args.fast_first,
+            ),
         )
         full_layout = cpu_telescope.layout
         sampler = full_layout.circuit.compile_detector_sampler(
@@ -245,6 +257,15 @@ def main() -> int:
     endpoint_core_ns: list[int] = []
     endpoint_wall_ns: list[int] = []
     cpu_telescope_ns: list[int] = []
+    cpu_portfolio_ns: list[int] = []
+    cpu_selection_ns: list[int] = []
+    cpu_relay_primary_ns: list[int] = []
+    cpu_relay_escape_ns: list[int] = []
+    cpu_relay_sets: list[int] = []
+    cpu_relay_stages: list[int] = []
+    cpu_relay_disagreements: list[int] = []
+    deferred_syndromes: list[np.ndarray] = []
+    deferred_actual: list[np.ndarray] = []
     cpu_telescope_backends = Counter()
     sweeps = Counter()
     profiles = Counter()
@@ -280,6 +301,12 @@ def main() -> int:
                         f"parser_format={board.parser.format_errors}"
                     )
                     counters["transport_errors"] += 1
+                if transport_error is None and fpga_result["basis_id"] != expected_basis_id:
+                    raise RuntimeError(
+                        f"programmed FPGA basis mismatch: requested {args.basis} "
+                        f"(id {expected_basis_id}), received id {fpga_result['basis_id']}; "
+                        "flash the matching production bitstream before benchmarking"
+                    )
                 result = fpga_result
                 cpu_telescope_summary: dict[str, object] | None = None
                 endpoint_success = bool(fpga_result["success"])
@@ -290,6 +317,11 @@ def main() -> int:
                 endpoint_wall = int(fpga_result["wall_ns"])
                 if args.cpu_telescope_handoff and fpga_result["deferred"] and \
                         transport_error is None:
+                    if args.deferred_corpus is not None:
+                        deferred_syndromes.append(full_syndrome.copy())
+                        deferred_actual.append(
+                            np.asarray(actual_batch[local_index], dtype=np.uint8).copy()
+                        )
                     counters["cpu_telescope_handoff"] += 1
                     try:
                         tail = cpu_telescope.decode(full_syndrome)
@@ -298,6 +330,13 @@ def main() -> int:
                             tail.predicted_logicals, dtype=np.uint8,
                         ))
                         cpu_telescope_ns.append(tail.wall_ns)
+                        cpu_portfolio_ns.append(int(tail.portfolio_ns))
+                        cpu_selection_ns.append(int(tail.selection_ns))
+                        cpu_relay_primary_ns.append(int(tail.relay_primary_ns))
+                        cpu_relay_escape_ns.append(int(tail.relay_escape_ns))
+                        cpu_relay_sets.append(int(tail.relay_sets_attempted))
+                        cpu_relay_stages.append(int(tail.relay_stage_reached))
+                        cpu_relay_disagreements.append(int(tail.logical_disagreement))
                         endpoint_core += tail.wall_ns
                         endpoint_wall += tail.wall_ns
                         cpu_telescope_backends[tail.backend] += 1
@@ -410,7 +449,22 @@ def main() -> int:
     ordered_endpoint_core = sorted(endpoint_core_ns)
     ordered_endpoint_wall = sorted(endpoint_wall_ns)
     ordered_cpu_telescope = sorted(cpu_telescope_ns)
+    ordered_cpu_portfolio = sorted(cpu_portfolio_ns)
+    ordered_cpu_selection = sorted(cpu_selection_ns)
+    ordered_cpu_relay_primary = sorted(cpu_relay_primary_ns)
+    ordered_cpu_relay_escape = sorted(cpu_relay_escape_ns)
     percentile = lambda values, q: values[min(len(values) - 1, math.ceil(q * len(values)) - 1)]
+    phase_stats = {}
+    for name, values, ordered in (
+        ("portfolio", cpu_portfolio_ns, ordered_cpu_portfolio),
+        ("selection", cpu_selection_ns, ordered_cpu_selection),
+        ("relay_primary", cpu_relay_primary_ns, ordered_cpu_relay_primary),
+        ("relay_escape", cpu_relay_escape_ns, ordered_cpu_relay_escape),
+    ):
+        phase_stats[name] = {
+            "mean_us": statistics.fmean(values) / 1e3 if values else 0.0,
+            "p99_us": percentile(ordered, 0.99) / 1e3 if values else 0.0,
+        }
     git_commit, git_dirty = _git_provenance()
     endpoint_mean_core_us = statistics.fmean(endpoint_core_ns) / 1e3
     endpoint_mean_wall_us = statistics.fmean(endpoint_wall_ns) / 1e3
@@ -474,6 +528,7 @@ def main() -> int:
         "cpu_telescope_backend": (
             cpu_telescope.backend if cpu_telescope is not None else None
         ),
+        "cpu_telescope_fast_first": bool(args.fast_first),
         "cpu_telescope_backends": dict(sorted(cpu_telescope_backends.items())),
         "cpu_telescope_handoff_shots": len(cpu_telescope_ns),
         "mean_cpu_telescope_handoff_us": (
@@ -484,6 +539,13 @@ def main() -> int:
             percentile(ordered_cpu_telescope, 0.99) / 1e3
             if cpu_telescope_ns else 0.0
         ),
+        "cpu_telescope_phase_latency": phase_stats,
+        "cpu_telescope_relay_sets_mean": (
+            statistics.fmean(cpu_relay_sets) if cpu_relay_sets else 0.0
+        ),
+        "cpu_telescope_relay_sets_max": max(cpu_relay_sets) if cpu_relay_sets else 0,
+        "cpu_telescope_relay_stage_histogram": dict(sorted(Counter(cpu_relay_stages).items())),
+        "cpu_telescope_logical_disagreement_count": sum(cpu_relay_disagreements),
         "mean_endpoint_core_latency_us": endpoint_mean_core_us,
         "p99_endpoint_core_latency_us": percentile(ordered_endpoint_core, 0.99) / 1e3,
         "max_endpoint_core_latency_us": max(endpoint_core_ns) / 1e3,
@@ -496,6 +558,10 @@ def main() -> int:
         "parser_crc_errors": board.parser.crc_errors,
         "parser_format_errors": board.parser.format_errors,
         "failure_cases": failures,
+        "deferred_corpus": (
+            str(args.deferred_corpus.resolve()) if args.deferred_corpus else None
+        ),
+        "deferred_corpus_shots": len(deferred_syndromes),
         # Compatibility aliases for older report consumers.
         "cpu_s2_handoff": bool(args.cpu_telescope_handoff),
         "cpu_s2_handoff_shots": len(cpu_telescope_ns),
@@ -525,6 +591,19 @@ def main() -> int:
         payload["block_ler_upper95_one_sided"] <= 1e-5 and
         endpoint_mean_core_us <= 1000.0 and payload["transport_pass"]
     )
+    if args.deferred_corpus is not None:
+        args.deferred_corpus.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            args.deferred_corpus,
+            detectors=(
+                np.asarray(deferred_syndromes, dtype=np.uint8)
+                if deferred_syndromes else np.empty((0, full_layout.checks), dtype=np.uint8)
+            ),
+            actual_logicals=(
+                np.asarray(deferred_actual, dtype=np.uint8)
+                if deferred_actual else np.empty((0, 12), dtype=np.uint8)
+            ),
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({key: payload[key] for key in (

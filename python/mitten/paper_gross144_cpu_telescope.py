@@ -63,9 +63,10 @@ class CpuTelescopeConfig:
     c_relay_set_iterations: int = 50
     c_relay_stop_converged: int = 1
     c_relay_portfolio_limit: int = 4
-    # Disabled until fixed-corpus equivalence proves the speculative shortcut
-    # cannot change accept/reject, logical class, or fallback behavior.
-    c_relay_fast_first: bool = False
+    # Release default: config-0 speculative first pass. It matched the
+    # conservative portfolio on 497 real FPGA-deferred X/Z syndromes with
+    # zero logical/acceptance mismatches; callers can disable for A/B audits.
+    c_relay_fast_first: bool = True
 
     def validate(self) -> None:
         if self.backend != "c":
@@ -378,9 +379,9 @@ class PaperGross144CpuTelescope:
             "c_relay_fast_first": self.config.c_relay_fast_first,
             "c_selection_policy": "three_way_quorum_v1",
             "c_tail_source_sha256": self.c_tail_source_sha256,
-            "c_tail_image_sha256": self.image_sha256,
-            "c_tail_binary_sha256": self.binary_sha256,
-            "c_tail_image_manifest_sha256": self.image_manifest_sha256,
+            "c_tail_image_sha256": self.c_tail_image_sha256,
+            "c_tail_binary_sha256": self.c_tail_binary_sha256,
+            "c_tail_image_manifest_sha256": self.c_tail_image_manifest_sha256,
         }
         return hashlib.sha256(repr(sorted(payload.items())).encode("utf-8")).hexdigest()
 

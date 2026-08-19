@@ -129,21 +129,23 @@ foreach ($required in @($fsPath, $reportPath, $timingPath)) {
 
 function Find-SlackNs([string]$text, [string]$kind) {
     $lines = $text -split "`r?`n"
+    $active = $false
+    $slacks = @()
     foreach ($line in $lines) {
-        $lower = $line.ToLowerInvariant()
-        if (-not $lower.Contains('slack')) { continue }
-        if ($kind -eq 'setup' -and ($lower.Contains('hold') -or
-                (-not $lower.Contains('setup') -and -not $lower.Contains('data')))) {
-            if ($lower.Contains('hold')) { continue }
+        $trimmed = $line.Trim()
+        if ($trimmed -eq 'SETUP' -or $trimmed -eq 'HOLD') {
+            $active = $trimmed -eq $kind.ToUpperInvariant()
+            continue
         }
-        if ($kind -eq 'hold' -and -not $lower.Contains('hold')) { continue }
-        $matches = [regex]::Matches($line, '[-+]?(?:\d+(?:\.\d*)?|\.\d+)\s*ns')
-        if ($matches.Count -gt 0) {
-            $value = $matches[$matches.Count - 1].Value -replace '\s*ns', ''
-            return [double]$value
+        # Gowin .timing_paths is compact numeric report: first value after
+        # each SETUP/HOLD header is slack, followed by arrival/required time.
+        if ($active -and $trimmed -match '^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$') {
+            $slacks += [double]$trimmed
+            $active = $false
         }
     }
-    return $null
+    if ($slacks.Count -eq 0) { return $null }
+    return ($slacks | Measure-Object -Minimum).Minimum
 }
 
 $timingText = (Get-Content -Raw -LiteralPath $timingPath) + "`n" +
