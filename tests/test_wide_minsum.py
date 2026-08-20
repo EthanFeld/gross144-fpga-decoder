@@ -8,9 +8,9 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.fixed_point import fixed_check_update  # noqa: E402
-from mitten.graph_model import Graph  # noqa: E402
-from mitten.wide_minsum import (  # noqa: E402
+from gross144_decoder.fixed_point import fixed_check_update  # noqa: E402
+from gross144_decoder.graph_model import Graph  # noqa: E402
+from gross144_decoder.wide_minsum import (  # noqa: E402
     GROSS144_FOUR_LANE_PAIR_GROUPS,
     WideMinSumConfig,
     _iteration_checks,

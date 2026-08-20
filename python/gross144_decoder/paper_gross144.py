@@ -1,4 +1,4 @@
-"""Exact Gross144 Stage-1 fixture used by the Mitten paper comparison.
+"""Exact Gross144 Stage-1 fixture used by the paper comparison.
 
 The paper's Gross144 comparison cites Relay-BP's public bicycle-bivariate
 Stim circuits.  Its first stage filters detectors to the initialization basis.
@@ -36,7 +36,7 @@ from .wide_minsum import (
 
 
 PAPER_RELAY_URL = "https://github.com/trmue/relay"
-# Last commit on Relay's main branch before the Mitten paper's cited
+# Last commit on Relay's main branch before the paper's cited
 # 2026-07-07 access date.  Fixture blobs are checked below as well, so a later
 # checkout is accepted only when it still has the cited bytes.
 PAPER_RELAY_COMMIT = "19d7023d476248858fc01bdf087ce673feaa4ef4"

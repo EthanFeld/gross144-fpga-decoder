@@ -26,10 +26,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.hybrid_warmup import quantize_llr  # noqa: E402
-from mitten.paper_gross144 import load_paper_gross144_stage1_layout  # noqa: E402
-from mitten.paper_gross144_component_templates import _full_translation_actions  # noqa: E402
-from mitten.paper_gross144_hash import (  # noqa: E402
+from gross144_decoder.hybrid_warmup import quantize_llr  # noqa: E402
+from gross144_decoder.paper_gross144 import load_paper_gross144_stage1_layout  # noqa: E402
+from gross144_decoder.paper_gross144_component_templates import _full_translation_actions  # noqa: E402
+from gross144_decoder.paper_gross144_hash import (  # noqa: E402
     compile_residual_hash_image,
     gf2_word_rank,
     transform_hash,

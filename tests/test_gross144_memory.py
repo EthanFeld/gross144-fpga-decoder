@@ -12,8 +12,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.gross144 import build_gross144  # noqa: E402
-from mitten.gross144_memory import (  # noqa: E402
+from gross144_decoder.gross144 import build_gross144  # noqa: E402
+from gross144_decoder.gross144_memory import (  # noqa: E402
     CHECKS_PER_TYPE,
     DATA_QUBITS,
     MEMORY_ROUNDS,
@@ -21,9 +21,9 @@ from mitten.gross144_memory import (  # noqa: E402
     build_gross144_memory_circuit,
     syndrome_layers,
 )
-from mitten.gross144_component_templates import compile_component_templates  # noqa: E402
-from mitten.hybrid_warmup import quantize_llr  # noqa: E402
-from mitten.minsum_reference import fixed_point_layered_min_sum  # noqa: E402
+from gross144_decoder.gross144_component_templates import compile_component_templates  # noqa: E402
+from gross144_decoder.hybrid_warmup import quantize_llr  # noqa: E402
+from gross144_decoder.minsum_reference import fixed_point_layered_min_sum  # noqa: E402
 
 
 class Gross144MemoryTests(unittest.TestCase):

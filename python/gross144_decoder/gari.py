@@ -12,7 +12,7 @@ from .graph_model import Graph
 from .minsum_reference import compute_syndrome
 
 
-SCHEMA = "MITTEN-GARI"
+SCHEMA = "GROSS144-GARI"
 VERSION = 1
 CHECK_TYPES = ("D_X", "D_Z", "U", "V")
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and verify the exact Relay-BP Gross144 fixture used by MITTEN."""
+"""Fetch and verify the exact Relay-BP Gross144 fixture used by this project."""
 
 from __future__ import annotations
 

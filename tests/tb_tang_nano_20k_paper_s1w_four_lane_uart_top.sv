@@ -5,7 +5,8 @@ module tb_tang_nano_20k_paper_s1w_four_lane_uart_top;
     logic uart_tx_pin, led;
     logic response_byte_valid;
     logic [7:0] response_byte;
-    logic [7:0] response_bytes [0:31];
+    logic [7:0] response_bytes [0:22];
+    logic response_capturing;
     logic [3:0] syndrome_groups [0:233];
     string syndrome_file;
     integer byte_index, response_count;
@@ -21,7 +22,7 @@ module tb_tang_nano_20k_paper_s1w_four_lane_uart_top;
 
     always #5 clk27 = ~clk27;
 
-    tang_nano_20k_paper_s1w_four_lane_uart_top dut (.*);
+    tang_nano_20k_paper_s1w_four_lane_uart_top #(.IDLE_FILL(1)) dut (.*);
 
     // Simulation-only cycle ledger. Enabled with +PROFILE_CYCLES.
     always @(posedge dut.clk51) begin
@@ -91,9 +92,15 @@ module tb_tang_nano_20k_paper_s1w_four_lane_uart_top;
     );
 
     always @(negedge clk27) begin
-        if (response_byte_valid && response_count < 32) begin
-            response_bytes[response_count] = response_byte;
-            response_count = response_count + 1;
+        if (response_byte_valid) begin
+            if (!response_capturing && response_byte == 8'h4d) begin
+                response_capturing = 1'b1;
+                response_count = 0;
+            end
+            if (response_capturing && response_count < 23) begin
+                response_bytes[response_count] = response_byte;
+                response_count = response_count + 1;
+            end
         end
     end
 
@@ -204,6 +211,7 @@ module tb_tang_nano_20k_paper_s1w_four_lane_uart_top;
         if (!$test$plusargs("ZERO_SYNDROME"))
             $readmemb(syndrome_file, syndrome_groups);
         response_count = 0;
+        response_capturing = 1'b0;
         repeat (8) @(posedge clk27);
         rst_n = 1;
         // Production UART reset is an independent 16-bit 27 MHz boot
@@ -256,7 +264,7 @@ module tb_tang_nano_20k_paper_s1w_four_lane_uart_top;
                    dut.result_sweeps_core, dut.result_cycles_core);
 
         timeout_cycles = 0;
-        while (response_count < 23 && timeout_cycles < 5000) begin
+        while (response_count < 23 && timeout_cycles < 20000) begin
             @(posedge clk27);
             timeout_cycles = timeout_cycles + 1;
         end
@@ -303,6 +311,7 @@ module tb_tang_nano_20k_paper_s1w_four_lane_uart_top;
                 $fatal(1, "S_ERROR recovery failed state=%h ready=%b error=%b",
                        dut.u_decoder.state, dut.start_ready, dut.decoder_error);
             response_count = 0;
+            response_capturing = 1'b0;
             send_decode_frame(16'h1235);
             timeout_cycles = 0;
             while (dut.result_toggle_core != 1'b0 && timeout_cycles < 3000000) begin

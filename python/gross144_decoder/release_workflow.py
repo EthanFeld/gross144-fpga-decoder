@@ -1,4 +1,4 @@
-"""Canonical software release workflow for the fast MITTEN decoder stages."""
+"""Canonical software release workflow for the fast decoder stages."""
 
 from __future__ import annotations
 

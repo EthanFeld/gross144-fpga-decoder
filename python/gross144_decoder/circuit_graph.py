@@ -11,7 +11,7 @@ from typing import Any, Mapping, Sequence
 from .graph_model import Graph
 
 
-SCHEMA = "MITTEN-CIRCUIT-GRAPH"
+SCHEMA = "GROSS144-CIRCUIT-GRAPH"
 VERSION = 1
 
 

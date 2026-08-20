@@ -5,10 +5,10 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.candidate_score import make_candidate  # noqa: E402
-from mitten.graph_model import Graph  # noqa: E402
-from mitten.telescope import Stage, StageResult, StageStatus  # noqa: E402
-from mitten.unified_stage_controller import (  # noqa: E402
+from gross144_decoder.candidate_score import make_candidate  # noqa: E402
+from gross144_decoder.graph_model import Graph  # noqa: E402
+from gross144_decoder.telescope import Stage, StageResult, StageStatus  # noqa: E402
+from gross144_decoder.unified_stage_controller import (  # noqa: E402
     GraphType,
     StageBudget,
     UnifiedStageControllerConfig,

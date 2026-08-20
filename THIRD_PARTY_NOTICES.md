@@ -1,6 +1,7 @@
 # Third-party references and provenance
 
-MITTEN does not vendor the Relay-BP source tree or its Gross144 Stim fixtures.
+Gross144 FPGA Decoder does not vendor the Relay-BP source tree or its Gross144
+Stim fixtures.
 The reproducibility workflow downloads the public fixture into ignored
 `build/relay` and pins it to commit
 `19d7023d476248858fc01bdf087ce673feaa4ef4`.
@@ -13,9 +14,9 @@ The reproducibility workflow downloads the public fixture into ignored
   Sufficient for Real-Time Decoding of Quantum Memory*, arXiv:2506.01779,
   https://arxiv.org/abs/2506.01779
 
-MITTEN's FPGA/common-path and C-tail implementation is a separate project. It
-uses the public Relay-BP paper and public test circuits as algorithmic/reference
-inputs and fixture provenance.
+Gross144 FPGA Decoder's FPGA/common-path and C-tail implementation is a
+separate project. It uses the public Relay-BP paper and public test circuits as
+algorithmic/reference inputs and fixture provenance.
 
 ## Gross `[[144,12,12]]` bivariate-bicycle code
 
@@ -32,7 +33,8 @@ inputs and fixture provenance.
   FPGAs*, arXiv:2510.21600, https://arxiv.org/abs/2510.21600
 
 The performance figures labeled "paper reference" in this repository are
-comparison values, not measurements produced by MITTEN.
+comparison values, not measurements produced by Gross144 FPGA Decoder.
 
-Third-party projects retain their own copyrights and licenses. MITTEN's own
-source is licensed under the Apache License 2.0; see [`LICENSE`](LICENSE).
+Third-party projects retain their own copyrights and licenses. The Gross144
+FPGA Decoder source is licensed under the Apache License 2.0; see
+[`LICENSE`](LICENSE).

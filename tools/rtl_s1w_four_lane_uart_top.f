@@ -1,6 +1,6 @@
 tests/tb_tang_nano_20k_paper_s1w_four_lane_uart_top.sv
 rtl/top/tang_nano_20k_paper_s1w_four_lane_uart_top.sv
-rtl/common/mitten_clock_51.sv
+rtl/common/gross144_clock_51.sv
 rtl/protocol/uart_rx.sv
 rtl/protocol/uart_tx.sv
 rtl/protocol/uart_framer.sv

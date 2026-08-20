@@ -19,7 +19,7 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     files = [root / line.strip() for line in (root / args.filelist).read_text().splitlines()
              if line.strip() and not line.lstrip().startswith("#")]
-    command = ["iverilog", "-g2012", "-DMITTEN_SIM", "-s", args.top,
+    command = ["iverilog", "-g2012", "-DGROSS144_SIM", "-s", args.top,
                "-o", os.fspath(output)]
     command.extend(os.fspath(path) for path in files)
     result = subprocess.run(command, cwd=root, check=False)

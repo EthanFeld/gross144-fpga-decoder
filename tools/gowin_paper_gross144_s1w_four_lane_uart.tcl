@@ -3,11 +3,11 @@
 # intentionally outside this release flow.
 set root [file normalize [file join [file dirname [info script]] ..]]
 set basis X
-if {[info exists ::env(MITTEN_BASIS)]} {
-    set basis [string toupper $::env(MITTEN_BASIS)]
+if {[info exists ::env(GROSS144_BASIS)]} {
+    set basis [string toupper $::env(GROSS144_BASIS)]
 }
 if {$basis ni {X Z}} {
-    error "MITTEN_BASIS must be X or Z"
+    error "GROSS144_BASIS must be X or Z"
 }
 set basis_lower [string tolower $basis]
 set project_name paper_gross144_s1w_four_lane_uart_production_${basis_lower}
@@ -33,7 +33,7 @@ foreach image {
 
 foreach source {
     {rtl top tang_nano_20k_paper_s1w_four_lane_uart_top.sv}
-    {rtl common mitten_clock_51.sv}
+    {rtl common gross144_clock_51.sv}
     {rtl protocol uart_rx.sv}
     {rtl protocol uart_tx.sv}
     {rtl protocol uart_framer.sv}
@@ -68,5 +68,5 @@ set_option -global_freq 40.5
 set_option -frequency 40.5
 set_option -output_base_name $project_name
 run all
-puts "MITTEN_PRODUCTION_BUILD_${basis}_DONE"
+puts "GROSS144_PRODUCTION_BUILD_${basis}_DONE"
 exit

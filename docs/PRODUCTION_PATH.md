@@ -1,7 +1,8 @@
 # Production path
 
-MITTEN's release contract is the hardware/software endpoint that was exercised
-in the authoritative 300,000-shot X and Z board campaigns on 2026-08-20.
+Gross144 FPGA Decoder's release contract is the hardware/software endpoint that
+was exercised in the authoritative 300,000-shot X and Z board campaigns on
+2026-08-20.
 
 ```text
 Stim / Relay-BP Gross144 fixture

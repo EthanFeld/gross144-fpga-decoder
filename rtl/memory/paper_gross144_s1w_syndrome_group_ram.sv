@@ -10,7 +10,7 @@ module paper_gross144_s1w_syndrome_group_ram #(
     input  logic [7:0] write_addr,
     input  logic [3:0] write_data
 );
-`ifndef MITTEN_SIM
+`ifndef GROSS144_SIM
     wire [15:0] dpb_read;
     wire [13:0] read_address = {2'b00, read_addr, 4'b0000};
     wire [13:0] write_address = {2'b00, write_addr, 4'b0000} | 14'h0003;

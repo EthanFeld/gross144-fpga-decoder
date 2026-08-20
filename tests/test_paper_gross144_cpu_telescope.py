@@ -11,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.paper_gross144_cpu_telescope import (  # noqa: E402
+from gross144_decoder.paper_gross144_cpu_telescope import (  # noqa: E402
     CpuTelescopeConfig,
     PaperGross144CpuTelescope,
 )

@@ -27,20 +27,36 @@ sys.path.insert(0, str(ROOT / "python"))
 
 BOARD_CLOCK = json.loads((ROOT / "config" / "board_clock.json").read_text(encoding="utf-8"))
 
-from mitten.paper_gross144 import (  # noqa: E402
+from gross144_decoder.paper_gross144 import (  # noqa: E402
     PaperGross144Stage1Config,
     PaperGross144Stage1FpgaAdapter,
     WideMinSumRescueProfile,
 )
-from mitten.paper_gross144_cpu_telescope import (  # noqa: E402
+from gross144_decoder.paper_gross144_cpu_telescope import (  # noqa: E402
     CpuTelescopeConfig,
     PaperGross144CpuTelescope,
 )
-from mitten.protocol import Frame, FrameParser, encode_frame  # noqa: E402
-from mitten.wide_minsum import GROSS144_FOUR_LANE_PAIR_GROUPS  # noqa: E402
+from gross144_decoder.ftdi_transport import (  # noqa: E402
+    Ftd2xxError,
+    Ftd2xxSerial,
+    Ftd2xxUnavailable,
+)
+from gross144_decoder.protocol import Frame, FrameParser, encode_frame  # noqa: E402
+from gross144_decoder.wide_minsum import GROSS144_FOUR_LANE_PAIR_GROUPS  # noqa: E402
 
 COMMAND = 0x31
 DEFAULT_CORE_CLOCK_HZ = float(BOARD_CLOCK["core_clock_hz"])
+DEFAULT_REQUEST_PAD_BYTES = 0
+RESPONSE_FIELD_BYTES = 11
+RESPONSE_USB_PAYLOAD_BYTES = 108
+_PACK_INDICES = np.asarray(
+    [
+        [time_index * 72 + coordinate for coordinate in group]
+        for time_index in range(13)
+        for group in GROSS144_FOUR_LANE_PAIR_GROUPS
+    ],
+    dtype=np.intp,
+)
 
 
 def _profiles() -> tuple[WideMinSumRescueProfile, ...]:
@@ -65,18 +81,34 @@ def _profiles() -> tuple[WideMinSumRescueProfile, ...]:
 
 
 def _pack_groups(syndrome: np.ndarray) -> bytes:
+    syndrome = np.asarray(syndrome, dtype=np.uint8)
     if syndrome.shape != (936,):
         raise ValueError(f"expected 936 detector bits, got {syndrome.shape}")
-    payload = bytearray(117)
-    ordinal = 0
-    for time_index in range(13):
-        for group in GROSS144_FOUR_LANE_PAIR_GROUPS:
-            word = 0
-            for lane, coordinate in enumerate(group):
-                word |= int(syndrome[time_index * 72 + coordinate]) << lane
-            payload[ordinal >> 1] |= word << (4 * (ordinal & 1))
-            ordinal += 1
-    return bytes(payload)
+    # Pack four lane bits into each nibble.  Keep scalar API for callers, but
+    # use same vectorized kernel as campaign batch path.
+    words = np.packbits(
+        syndrome[_PACK_INDICES], axis=-1, bitorder="little",
+    ).reshape(-1)
+    payload = words[::2] | (words[1::2] << 4)
+    return payload.tobytes()
+
+
+def _pack_groups_batch(syndromes: np.ndarray) -> np.ndarray:
+    """Pack all detector words before entering per-shot UART loop."""
+    syndromes = np.asarray(syndromes, dtype=np.uint8)
+    if syndromes.ndim != 2 or syndromes.shape[1] != 936:
+        raise ValueError(f"expected (N, 936) detector bits, got {syndromes.shape}")
+    words = np.packbits(syndromes[:, _PACK_INDICES], axis=-1, bitorder="little")
+    return np.ascontiguousarray(words[:, ::2] | (words[:, 1::2] << 4))
+
+
+def _logical_words_batch(actual: np.ndarray) -> np.ndarray:
+    """Convert Stim's twelve observable bits to packed host integers."""
+    actual = np.asarray(actual, dtype=np.uint8)
+    if actual.ndim != 2 or actual.shape[1] != 12:
+        raise ValueError(f"expected (N, 12) observable bits, got {actual.shape}")
+    packed = np.packbits(actual, axis=1, bitorder="little")
+    return packed[:, 0].astype(np.uint16) | (packed[:, 1].astype(np.uint16) << 8)
 
 
 def _word(bits: np.ndarray) -> int:
@@ -119,25 +151,51 @@ def _git_provenance() -> tuple[str, bool]:
 
 
 class Board:
-    def __init__(self, port: str, baud: int, timeout: float):
+    def __init__(
+        self, port: str, baud: int, timeout: float, *,
+        transport: str = "auto", ftdi_latency_ms: int = 1,
+        request_pad_bytes: int = DEFAULT_REQUEST_PAD_BYTES,
+    ):
         import serial  # type: ignore
         self._serial_module = serial
         self._serial_exception = serial.SerialException
         self.port = port
         self.baud = baud
         self.timeout = timeout
+        self.transport = transport
+        self.ftdi_latency_ms = ftdi_latency_ms
+        self.request_pad_bytes = request_pad_bytes
+        self.backend = "unknown"
+        self.backend_fallback: str | None = None
         self.sequence = 1
         self.reconnects = 0
         self.parser = FrameParser(max_payload=117)
+        self.response_payload_bytes: int | None = None
         self._open()
 
     def _open(self) -> None:
         serial = self._serial_module
+        if self.transport in ("auto", "d2xx"):
+            try:
+                self.serial = Ftd2xxSerial(
+                    self.port, self.baud, self.timeout, self.ftdi_latency_ms,
+                )
+                self.backend = "ftd2xx"
+                return
+            except (Ftd2xxUnavailable, Ftd2xxError) as exc:
+                if self.transport == "d2xx":
+                    raise
+                self.backend_fallback = f"{type(exc).__name__}: {exc}"
         self.serial = serial.Serial(
             port=self.port, baudrate=self.baud, bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
-            timeout=0.01, write_timeout=1.0,
+            # A blocking read(1) adds the VCP timeout before every response
+            # that arrives while the UART is idle.  The campaign already has
+            # its own deadline, so keep the driver nonblocking and drain only
+            # bytes currently buffered by the USB bridge.
+            timeout=0, write_timeout=1.0,
         )
+        self.backend = "pyserial"
 
     def _reconnect(self) -> None:
         # FTDI/WinUSB can transiently reject WriteFile after a long run.  A
@@ -153,8 +211,13 @@ class Board:
         self.serial.close()
 
     def decode(self, syndrome: np.ndarray) -> dict[str, int | float | bool]:
+        return self.decode_payload(_pack_groups(syndrome))
+
+    def decode_payload(self, payload: bytes | bytearray | memoryview) -> dict[str, int | float | bool]:
+        payload = bytes(payload)
+        if len(payload) != 117:
+            raise ValueError(f"expected 117-byte packed syndrome, got {len(payload)}")
         sequence = self.sequence
-        payload = _pack_groups(syndrome)
         start = time.perf_counter_ns()
         last_sequence = sequence
         for attempt in range(2):
@@ -163,13 +226,20 @@ class Board:
                 sequence = 1 if sequence == 0xFFFF else sequence + 1
             last_sequence = sequence
             request = encode_frame(Frame(COMMAND, sequence, payload))
+            if self.request_pad_bytes:
+                # Optional transport experiment: inert bytes after CRC are
+                # ignored while the FPGA framer searches for the next magic.
+                request += b"\x00" * self.request_pad_bytes
             try:
                 self.serial.write(request)
-                self.serial.flush()
+                # Response cannot exist before request bytes reach FPGA. Read
+                # path therefore drains TX naturally; flush() serialized that
+                # wire time before decoder work and cut shot rate.
                 deadline = time.monotonic() + self.timeout
                 while time.monotonic() < deadline:
                     chunk = self.serial.read(max(1, self.serial.in_waiting))
                     if not chunk:
+                        time.sleep(0.0001)
                         continue
                     for frame in self.parser.feed(chunk):
                         if frame.sequence != sequence:
@@ -178,10 +248,12 @@ class Board:
                             raise RuntimeError(
                                 f"unexpected response command 0x{frame.command:02x}"
                             )
-                        if len(frame.payload) != 11:
+                        if len(frame.payload) not in (
+                                RESPONSE_FIELD_BYTES, RESPONSE_USB_PAYLOAD_BYTES):
                             raise RuntimeError(
                                 f"unexpected response length {len(frame.payload)}"
                             )
+                        self.response_payload_bytes = len(frame.payload)
                         status = frame.payload[0]
                         self.sequence = 1 if sequence == 0xFFFF else sequence + 1
                         return {
@@ -196,7 +268,7 @@ class Board:
                             "wall_ns": time.perf_counter_ns() - start,
                         }
                 raise TimeoutError(f"timeout waiting for sequence {sequence}")
-            except (self._serial_exception, TimeoutError):
+            except (self._serial_exception, Ftd2xxError, TimeoutError):
                 if attempt == 0:
                     continue
                 raise
@@ -211,6 +283,18 @@ def _args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=260_813_002)
     parser.add_argument("--batch-size", type=int, default=2048)
     parser.add_argument("--baud", type=int, default=3_000_000)
+    parser.add_argument(
+        "--transport", choices=("auto", "serial", "d2xx"), default="auto",
+        help="board transport; auto selects low-latency FTDI D2XX on Windows",
+    )
+    parser.add_argument(
+        "--ftdi-latency-ms", type=int, default=1,
+        help="D2XX USB latency timer (1..255 ms; default 1)",
+    )
+    parser.add_argument(
+        "--request-pad-bytes", type=int, default=DEFAULT_REQUEST_PAD_BYTES,
+        help="optional inert bytes after each request CRC (default 0)",
+    )
     parser.add_argument(
         "--core-clock-hz", type=float, default=DEFAULT_CORE_CLOCK_HZ,
         help="production clock from config/board_clock.json used for cycle conversion",
@@ -254,12 +338,14 @@ def _args() -> argparse.Namespace:
 def main() -> int:
     args = _args()
     if (args.shots < 1 or args.batch_size < 1 or args.timeout <= 0 or
+            not 1 <= args.ftdi_latency_ms <= 255 or
+            not 0 <= args.request_pad_bytes <= 4096 or
             args.core_clock_hz <= 0 or
             (args.max_endpoint_latency_us is not None and
              args.max_endpoint_latency_us <= 0)):
         raise SystemExit(
-            "shots, batch-size, timeout, core-clock-hz, and optional latency "
-            "gate must be positive"
+            "shots, batch-size, timeout, ftdi-latency-ms, core-clock-hz, and "
+            "optional latency gate must be valid"
         )
     if args.deferred_corpus is not None and not args.cpu_telescope_handoff:
         raise SystemExit("--deferred-corpus requires --cpu-telescope-handoff")
@@ -298,7 +384,11 @@ def main() -> int:
         s2_image = None
         selected_detector_indices = None
         sampler = layout.circuit.compile_detector_sampler(seed=args.seed)
-    board = Board(args.port, args.baud, args.timeout)
+    board = Board(
+        args.port, args.baud, args.timeout,
+        transport=args.transport, ftdi_latency_ms=args.ftdi_latency_ms,
+        request_pad_bytes=args.request_pad_bytes,
+    )
     cycles: list[int] = []
     wall_ns: list[int] = []
     endpoint_core_ns: list[int] = []
@@ -325,19 +415,22 @@ def main() -> int:
             detector_batch, actual_batch = sampler.sample(
                 take, separate_observables=True,
             )
+            full_detector_batch = np.asarray(detector_batch, dtype=np.uint8)
+            actual_words = _logical_words_batch(actual_batch)
+            syndrome_batch = (
+                full_detector_batch[:, selected_detector_indices]
+                if args.cpu_telescope_handoff else full_detector_batch
+            )
+            # Expensive bit permutation/vector packing happens once per
+            # sampler batch, not once per UART transaction.
+            payload_batch = _pack_groups_batch(syndrome_batch)
             for local_index in range(take):
-                full_syndrome = np.asarray(
-                    detector_batch[local_index], dtype=np.uint8,
-                )
-                syndrome = (
-                    full_syndrome[selected_detector_indices]
-                    if args.cpu_telescope_handoff else full_syndrome
-                )
-                actual = _word(np.asarray(actual_batch[local_index], dtype=np.uint8))
+                full_syndrome = full_detector_batch[local_index]
+                actual = int(actual_words[local_index])
                 index = counters["shots"]
                 transport_error: str | None = None
                 try:
-                    fpga_result = board.decode(syndrome)
+                    fpga_result = board.decode_payload(payload_batch[local_index])
                 except Exception as exc:
                     fpga_result = {"success": False, "deferred": False, "error": True,
                               "logical": -1, "cycles": 0, "sweeps": 0,
@@ -556,6 +649,12 @@ def main() -> int:
         "core_clock_hz": args.core_clock_hz,
         "core_latency_us": mean_cycles / args.core_clock_hz * 1e6,
         "baud": args.baud,
+        "transport_requested": args.transport,
+        "transport_backend": board.backend,
+        "transport_fallback": board.backend_fallback,
+        "ftdi_latency_ms": args.ftdi_latency_ms if board.backend == "ftd2xx" else None,
+        "request_transport_pad_bytes": args.request_pad_bytes,
+        "response_payload_bytes": board.response_payload_bytes,
         "counters": dict(counters),
         "fpga_block_ler": counters["fpga_failures"] / shots,
         "fpga_block_ler_upper95_one_sided": _one_sided_upper95(
@@ -662,6 +761,7 @@ def main() -> int:
     print(json.dumps({key: payload[key] for key in (
         "basis", "shots", "block_ler", "block_ler_upper95_one_sided",
         "mean_core_latency_us", "mean_endpoint_core_latency_us",
+        "transport_backend", "ftdi_latency_ms", "shots_per_second",
         "mean_cpu_telescope_handoff_us", "cpu_telescope_backend",
         "endpoint_pass",
     )}, indent=2))

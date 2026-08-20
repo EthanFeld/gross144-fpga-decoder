@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class FoundationTests(unittest.TestCase):
     def test_required_layout_exists(self):
         required = (
-            "python/mitten",
+            "python/gross144_decoder",
             "rtl/common",
             "rtl/decoder",
             "rtl/memory",

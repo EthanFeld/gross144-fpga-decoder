@@ -21,7 +21,7 @@ module paper_gross144_s1w_check_record_ram #(
 );
     localparam integer SLICES = (RECORD_WIDTH + 15) / 16;
 
-`ifndef MITTEN_SIM
+`ifndef GROSS144_SIM
     wire [15:0] slice_read [0:SLICES-1];
     wire [SLICES*16-1:0] packed_read;
     wire [63:0] padded_write = {{(64-RECORD_WIDTH){1'b0}}, write_data};

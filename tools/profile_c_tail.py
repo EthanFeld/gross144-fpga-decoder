@@ -15,7 +15,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.paper_gross144_cpu_telescope import (  # noqa: E402
+from gross144_decoder.paper_gross144_cpu_telescope import (  # noqa: E402
     CpuTelescopeConfig,
     PaperGross144CpuTelescope,
 )
@@ -75,12 +75,12 @@ def profile_basis(basis: str, *, shots: int, set_iterations: int) -> dict[str, o
         "basis": basis,
         "shots": int(len(values)),
         "set_iterations": set_iterations,
-        "relay_sets": int(os.environ.get("MITTEN_C_TAIL_RELAY_SETS", "32")),
+        "relay_sets": int(os.environ.get("GROSS144_C_TAIL_RELAY_SETS", "32")),
         "relay_fallback_sets": int(
-            os.environ.get("MITTEN_C_TAIL_RELAY_FALLBACK_SETS", "240")
+            os.environ.get("GROSS144_C_TAIL_RELAY_FALLBACK_SETS", "240")
         ),
         "portfolio_limit": int(
-            os.environ.get("MITTEN_C_TAIL_PORTFOLIO_LIMIT", "4")
+            os.environ.get("GROSS144_C_TAIL_PORTFOLIO_LIMIT", "4")
         ),
         "wrong_cosets": int(wrong),
         "wrong_indices": wrong_indices,
@@ -124,7 +124,7 @@ def main() -> int:
     bases = ("X", "Z") if args.basis == "both" else (args.basis,)
     started = time.perf_counter()
     report = {
-        "schema": "MITTEN-C-TAIL-PROFILE-V1",
+        "schema": "GROSS144-C-TAIL-PROFILE-V1",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "elapsed_s": None,
         "results": [

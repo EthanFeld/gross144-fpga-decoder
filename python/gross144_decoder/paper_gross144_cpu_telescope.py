@@ -129,7 +129,7 @@ class _CRelayWorker:
         self._distro = distro
         source = repo_root / "tools" / "c_tail_worker.c"
         exporter = repo_root / "tools" / "export_paper_gross144_c_tail.py"
-        stage2_source = repo_root / "python" / "mitten" / "paper_gross144_stage2.py"
+        stage2_source = repo_root / "python" / "gross144_decoder" / "paper_gross144_stage2.py"
         source_sha256 = _sha256_file(source)
         exporter_sha256 = _sha256_file(exporter)
         stage2_source_sha256 = _sha256_file(stage2_source)
@@ -141,7 +141,7 @@ class _CRelayWorker:
             "exporter_sha256": exporter_sha256,
             "stage2_source_sha256": stage2_source_sha256,
             "relay_fixture_sha256": relay_sha256,
-            "format": "MITTEN-C-TAIL-IMAGE-V1",
+            "format": "GROSS144-C-TAIL-IMAGE-V1",
         }
         image_key = hashlib.sha256(
             json.dumps(image_inputs, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -149,7 +149,7 @@ class _CRelayWorker:
         binary_inputs = {
             "c_tail_source_sha256": source_sha256,
             "compile": "gcc -O3 -march=native -mtune=native -flto -fopenmp -DNDEBUG -std=c11",
-            "format": "MITTEN-C-TAIL-BINARY-V1",
+            "format": "GROSS144-C-TAIL-BINARY-V1",
         }
         binary_key = hashlib.sha256(
             json.dumps(binary_inputs, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -191,21 +191,21 @@ class _CRelayWorker:
         worker_env.setdefault("OMP_DYNAMIC", "FALSE")
         worker_env.setdefault("OMP_PROC_BIND", "spread")
         worker_env.setdefault("OMP_PLACES", "cores")
-        worker_env["MITTEN_C_TAIL_RELAY_PRE"] = str(config.c_relay_pre_iterations)
-        worker_env["MITTEN_C_TAIL_RELAY_SETS"] = str(config.c_relay_sets)
-        worker_env["MITTEN_C_TAIL_RELAY_FALLBACK_SETS"] = str(
+        worker_env["GROSS144_C_TAIL_RELAY_PRE"] = str(config.c_relay_pre_iterations)
+        worker_env["GROSS144_C_TAIL_RELAY_SETS"] = str(config.c_relay_sets)
+        worker_env["GROSS144_C_TAIL_RELAY_FALLBACK_SETS"] = str(
             config.c_relay_fallback_sets
         )
-        worker_env["MITTEN_C_TAIL_RELAY_SET_ITERS"] = str(config.c_relay_set_iterations)
-        worker_env["MITTEN_C_TAIL_RELAY_STOP"] = str(config.c_relay_stop_converged)
-        worker_env["MITTEN_C_TAIL_PORTFOLIO_LIMIT"] = str(config.c_relay_portfolio_limit)
-        worker_env["MITTEN_C_TAIL_FAST_FIRST"] = "1" if config.c_relay_fast_first else "0"
+        worker_env["GROSS144_C_TAIL_RELAY_SET_ITERS"] = str(config.c_relay_set_iterations)
+        worker_env["GROSS144_C_TAIL_RELAY_STOP"] = str(config.c_relay_stop_converged)
+        worker_env["GROSS144_C_TAIL_PORTFOLIO_LIMIT"] = str(config.c_relay_portfolio_limit)
+        worker_env["GROSS144_C_TAIL_FAST_FIRST"] = "1" if config.c_relay_fast_first else "0"
         forwarded = (
             "OMP_NUM_THREADS", "OMP_DYNAMIC", "OMP_PROC_BIND", "OMP_PLACES",
-            "MITTEN_C_TAIL_FAST_FIRST", "MITTEN_C_TAIL_RELAY_SETS",
-            "MITTEN_C_TAIL_RELAY_FALLBACK_SETS", "MITTEN_C_TAIL_PORTFOLIO_LIMIT",
-            "MITTEN_C_TAIL_RELAY_PRE", "MITTEN_C_TAIL_RELAY_SET_ITERS",
-            "MITTEN_C_TAIL_RELAY_STOP",
+            "GROSS144_C_TAIL_FAST_FIRST", "GROSS144_C_TAIL_RELAY_SETS",
+            "GROSS144_C_TAIL_RELAY_FALLBACK_SETS", "GROSS144_C_TAIL_PORTFOLIO_LIMIT",
+            "GROSS144_C_TAIL_RELAY_PRE", "GROSS144_C_TAIL_RELAY_SET_ITERS",
+            "GROSS144_C_TAIL_RELAY_STOP",
         )
         linux_env = [f"{name}={worker_env[name]}" for name in forwarded if name in worker_env]
         self._process = subprocess.Popen(

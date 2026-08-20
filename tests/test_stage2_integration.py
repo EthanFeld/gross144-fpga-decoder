@@ -5,17 +5,17 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.candidate_score import make_candidate  # noqa: E402
-from mitten.gari import GariGraph  # noqa: E402
-from mitten.graph_model import Graph  # noqa: E402
-from mitten.stage2_integration import (  # noqa: E402
+from gross144_decoder.candidate_score import make_candidate  # noqa: E402
+from gross144_decoder.gari import GariGraph  # noqa: E402
+from gross144_decoder.graph_model import Graph  # noqa: E402
+from gross144_decoder.stage2_integration import (  # noqa: E402
     Stage2Cache,
     Stage2IntegrationConfig,
     Stage2Profile,
     run_stage2_integration,
     run_telescope_with_stage2,
 )
-from mitten.telescope import Stage, StageResult, StageStatus  # noqa: E402
+from gross144_decoder.telescope import Stage, StageResult, StageStatus  # noqa: E402
 
 
 class Stage2IntegrationTests(unittest.TestCase):
@@ -96,7 +96,7 @@ class Stage2IntegrationTests(unittest.TestCase):
 
         # The B08 controller itself short-circuits S2 after Stage-1 success;
         # this is the integration-level defer policy guard.
-        from mitten.telescope import run_telescope
+        from gross144_decoder.telescope import run_telescope
         short = run_telescope(
             self.original,
             adapters={Stage.S1: stage1_success, Stage.S2: should_not_run},

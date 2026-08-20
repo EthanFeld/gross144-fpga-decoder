@@ -15,7 +15,7 @@ Push-Location $root
 try {
     & $verilator --cc --main --timing `
         --top-module tb_tang_nano_20k_paper_s1w_four_lane_uart_top `
-        -DMITTEN_SIM -Wno-fatal -f tools\rtl_s1w_four_lane_uart_top.f `
+        -DGROSS144_SIM -Wno-fatal -f tools\rtl_s1w_four_lane_uart_top.f `
         --Mdir $Mdir -o four_lane_uart_sim.exe
     if ($LASTEXITCODE -ne 0) { throw "Verilator generation failed: $LASTEXITCODE" }
 

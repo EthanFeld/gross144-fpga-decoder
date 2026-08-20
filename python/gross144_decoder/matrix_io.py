@@ -60,7 +60,7 @@ def validate_matrix(rows: Sequence[Sequence[int]]) -> Matrix:
 
 
 def _load_npy(source: Path) -> Matrix:
-    """Load the strict uint8, C-order 2-D NPY subset used by MITTEN."""
+    """Load the strict uint8, C-order 2-D NPY subset used by the decoder."""
 
     raw = source.read_bytes()
     if len(raw) < 10 or raw[:6] != b"\x93NUMPY":

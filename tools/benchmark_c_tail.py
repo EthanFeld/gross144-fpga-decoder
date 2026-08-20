@@ -18,7 +18,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.paper_gross144_cpu_telescope import (  # noqa: E402
+from gross144_decoder.paper_gross144_cpu_telescope import (  # noqa: E402
     CpuTelescopeConfig,
     PaperGross144CpuTelescope,
 )
@@ -89,7 +89,7 @@ def main() -> int:
     args = parser.parse_args()
     bases = ("X", "Z") if args.basis == "both" else (args.basis,)
     report = {
-        "schema": "MITTEN-C-TAIL-BENCHMARK-V1",
+        "schema": "GROSS144-C-TAIL-BENCHMARK-V1",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "results": [
             benchmark_basis(basis, shots=args.shots, seed=args.seed + offset)

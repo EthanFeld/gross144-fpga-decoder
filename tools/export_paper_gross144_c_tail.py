@@ -12,7 +12,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.paper_gross144_stage2 import (  # noqa: E402
+from gross144_decoder.paper_gross144_stage2 import (  # noqa: E402
     _compact_edge_faults,
     compile_paper_gross144_stage2_templates,
 )

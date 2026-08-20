@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.paper_gross144_hash import (  # noqa: E402
+from gross144_decoder.paper_gross144_hash import (  # noqa: E402
     HASH_WIDTH,
     add_coordinates,
     compile_residual_hash_image,

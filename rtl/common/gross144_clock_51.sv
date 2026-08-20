@@ -4,12 +4,12 @@
 // 40.5 MHz is the timing-clean production point. The historical module/file
 // names retain `_51` for project/tool compatibility; board metadata is the
 // clock source of truth.
-module mitten_clock_51 (
+module gross144_clock_51 (
     input  logic clk27,
     output logic clk51,
     output logic locked
 );
-`ifdef MITTEN_SIM
+`ifdef GROSS144_SIM
     assign clk51 = clk27;
     assign locked = 1'b1;
 `else

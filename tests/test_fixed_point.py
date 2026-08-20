@@ -5,7 +5,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.fixed_point import (  # noqa: E402
+from gross144_decoder.fixed_point import (  # noqa: E402
     MESSAGE_MAG_MAX,
     POSTERIOR_MAX,
     POSTERIOR_MIN,

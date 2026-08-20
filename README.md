@@ -1,309 +1,288 @@
-# MITTEN Gross144 board endpoint
+# Gross144 FPGA Decoder
 
-MITTEN is a hardware/software qLDPC decoder prototype for the Gross
-`[[144,12,12]]` bivariate-bicycle code. It maps the common decoding path onto a
-Tang Nano 20K (`GW2AR-18C`) FPGA and sends only rare hard cases to a persistent
-C Relay-lite tail on the host.
+Resource-constrained FPGA decoding for the Gross `[[144,12,12]]` qLDPC
+memory.
 
-The project is primarily an FPGA architecture and verification exercise: it
-compresses the Paper Gross144 S1 topology by **44.3x**, schedules the decoder
-across four banked lanes, uses exact syndrome replay as the FPGA acceptance
-certificate, and closes timing at a **40.5 MHz** production clock.
+This repository implements the common decoding path for the Gross
+bivariate-bicycle code on a Tang Nano 20K (`GW2AR-18C`). It compresses the
+Paper Gross144 Stage-1 topology by **44.3x**, executes check updates across
+four banked FPGA lanes, verifies accepted candidates by exact syndrome replay,
+and routes terminal defers to a persistent C Relay-lite tail on the host.
 
-**Release status:** the final physical-board X and Z campaigns each completed
-**300,000 shots at `p=0.2%` with zero endpoint failures**. Their one-sided 95%
-block-LER upper bound is `9.9857e-6`, meeting the `1e-5` release target.
+X and Z use separate basis-specific FPGA images. The release target is
+`p=0.2%`, block LER `<=1e-5`, with endpoint latency reported at order-ms scale.
+
+## At a glance
+
+| Item | X | Z |
+| --- | ---: | ---: |
+| Code / basis | Gross `[[144,12,12]]` / X memory | Gross `[[144,12,12]]` / Z memory |
+| Physical error rate | `0.002` | `0.002` |
+| Board shots | 300,000 | 300,000 |
+| Endpoint failures | **0** | **0** |
+| One-sided 95% block-LER upper bound | `9.9857e-6` | `9.9857e-6` |
+| FPGA defer rate | `4.37%` | `4.09%` |
+| Mean FPGA core latency | `1.220 ms` | `1.202 ms` |
+| Mean hybrid core latency | `2.778 ms` | `2.294 ms` |
+| Mean endpoint wall time | `18.003 ms` | `17.611 ms` |
+| FPGA clock | `40.5 MHz` | `40.5 MHz` |
+| Logic | 19,773 / 20,736 (`96%`) | 19,850 / 20,736 (`96%`) |
+| BSRAM | 39 / 46 (`85%`) | 39 / 46 (`85%`) |
+
+The authoritative 300k campaigns are recorded in
+[`reports/release_evidence.json`](reports/release_evidence.json), including
+capture provenance, bitstream hashes, timing data, defer counts, and the LER
+confidence bound.
+
+## Architecture
 
 ```text
-936 selected detector bits
+Stim / Relay Gross144 circuit
         |
-        v
-  Tang Nano 20K FPGA
-  four-lane S1W @ 40.5 MHz
-        | accepted             | verified defer
-        v                      v
-   logical word        full 1,728-bit syndrome on host
-                               |
-                               v
-                       persistent C Relay-lite tail
-                               |
-                               v
-                         endpoint logical word
+        | full 1,728-detector sample + true observables retained by host
+        |
+        +---- select and pack 936 basis-specific detector bits
+                              |
+                              v
+                    3 Mbaud framed UART
+                              |
+                              v
+                    Tang Nano 20K FPGA
+                four-lane S1W @ 40.5 MHz
+                  /                     \
+        syndrome-consistent          terminal defer
+          fast-path result                |
+                  |                        +---- full detector word
+                  |                              already retained on host
+                  |                                      |
+                  |                                      v
+                  |                           persistent C Relay-lite tail
+                  |                                      |
+                  +----------------------+---------------+
+                                         v
+                                endpoint logical word
+                                         |
+                                         v
+                           compare with Stim observables
 ```
 
-Supported release images are basis `X` and basis `Z`. Historical B3, H03,
-probe, alternate-clock, and Open975 paths are not release interfaces.
+Production flow:
 
-For the release contract and exact evidence provenance, see
-[`docs/PRODUCTION_PATH.md`](docs/PRODUCTION_PATH.md) and
-[`reports/release_evidence.json`](reports/release_evidence.json).
+1. Stim samples the pinned Gross144 circuit. The host retains the full
+   1,728-detector word and hidden 12-bit observable word for evaluation.
+2. The host selects 936 basis-specific detector bits and packs them into
+   117 UART bytes.
+3. The FPGA runs the fixed-point, four-lane Paper Gross144 S1W decoder.
+4. The resident 20-bit residual hash is rejection-only. Accepted candidates
+   are replayed against all 936 selected checks before acceptance.
+5. A terminal defer invokes one persistent C Relay-lite worker using the full
+   detector word already held by the host.
+6. The endpoint logical word is compared with Stim's hidden observables.
 
-## Current headline numbers
+Exact replay establishes syndrome consistency for FPGA-accepted candidates;
+logical performance is measured independently against the hidden observables.
 
-Target: `p = 0.2%`, block LER `<= 1e-5`; endpoint latency measured in
-order-ms, no sub-ms gate.
+## Why the FPGA fits
 
-| Board capture | Shots | Endpoint failures | Point LER | One-sided 95% upper bound | FPGA mean | Endpoint mean | C tail mean |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| X 300k statistical run | 300,000 | 0 | 0 | `9.9857e-6` | `1.220 ms` | `2.778 ms` | `35.64 ms` |
-| Z 300k statistical run | 300,000 | 0 | 0 | `9.9857e-6` | `1.202 ms` | `2.294 ms` | `26.67 ms` |
+The direct Stage-1 representation has 8,784 variables, 936 checks, and 30,672
+edges. Its explicit edge topology alone requires 429,408 bits. The Gross code's
+`Z12 x Z6` translation action has order 72 and reduces the stored topology to
+122 variable orbits plus reusable translated templates.
 
-Both X/Z 300k runs pass statistical LER target: zero endpoint, transport,
-parser, or decoder errors; all 25,402 C-tail defers were accepted. Endpoint
-latency is dominated by CPU tail, remains acceptable at order-ms scale.
-
-Paper comparison numbers supplied for this target:
-
-| Metric | Paper reference | Current board evidence |
-| --- | ---: | ---: |
-| Block LER | `1.9e-6` | X/Z: `<= 9.9857e-6` at 300k |
-| LER / syndrome-extraction round | `1.6e-7` | not established on board |
-| LER / round / logical qubit | `1.3e-8` | not established on board |
-
-X/Z meet statistical LER target at 300,000 shots. X endpoint is `2.778 ms`,
-Z `2.294 ms`; both accepted as order-ms performance. Latency remains reported,
-not pass/fail.
-
-## Build status
-
-Current basis-specific build/timing proofs:
-
-| Basis | Requested clock | Achieved Fmax | Setup / hold slack | Bitstream SHA-256 |
-| --- | ---: | ---: | ---: | --- |
-| X | 40.500 MHz | 40.533 MHz | `+0.020 / +0.202 ns` | `A875EACBB244F9CA9A4408C28545E51BAD5B522DC090F083A2742E9E73E28303` |
-| Z | 40.500 MHz | 41.445 MHz | `+0.563 / +0.077 ns` | `A74BBA39F7E5CBC2C51A75834FCEA8F06D7C4E994E9CD9A307C0C3CCBE96FFB8` |
-
-Clock source of truth: [`config/board_clock.json`](config/board_clock.json).
-The prior 51 MHz image had negative setup slack; current production target is
-40.5 MHz, with build rejection on negative post-route setup/hold slack.
-
-## Algorithmic compression and reduction history
-
-The reductions below were reconstructed from the optimization work and frozen
-image reports. `Production` means present in the current FPGA/host path;
-`Model` means validated in software or an RTL/storage model but not yet a
-board claim.
-
-### 1. FPGA/host split removes the full tail from the FPGA
-
-| Before | After | Reduction |
-| --- | --- | --- |
-| FPGA carries the complete rare-tail decoder state | FPGA runs common S1W; host retains the full 1,728-bit syndrome only for rare defers | Removes the full S2R message/posterior image from the FPGA common path |
-| 1,728 detector bits sent as general transport | 936 basis-filtered detector bits packed into 117 UART bytes | 45.8% fewer detector bits; 8:1 bit packing |
-
-This is the core fit-to-board decision. The host already owns the sampled
-syndrome, so a defer does not require a second 1,728-bit transfer.
-
-### 2. Paper S1 spatial quotient
-
-The full Paper S1 image has 8,784 variables, 936 checks, and 30,672 edges.
-Its `Z12 x Z6` translation action has order 72 and reduces the stored
-variable topology to 122 variable orbits plus reusable translated templates.
-
-| Representation | Size |
+| Stage-1 representation | Storage |
 | --- | ---: |
 | Explicit edge topology | 429,408 bits |
 | Quotient/template topology | 9,694 bits |
-| Reduction | **44.3x smaller** |
+| Compression | **44.3x** |
 
-The current image stores 13 time templates, 468 banked lane words, and 122
-orbit-color words, then reconstructs translated rows by rule. This replaces a
-936-row neighbor/address image with a compiler-checked quotient.
+The production image combines several reductions:
 
-Status: `Production`.
+- **Transport projection:** 1,728 detector bits become 936 basis-selected bits,
+  packed into 117 bytes: 45.8% fewer transmitted bits.
+- **Static four-bank coloring:** `(orbit_color + x) mod 4` maps translated
+  variables to banks without runtime conflict search.
+- **Bounded schedule:** maximum template degree is 35, requiring at most nine
+  four-edge beats per check.
+- **Compressed check state:** `min1`, `min2`, `argmin`, signs, and validity
+  replace a full edge-message store.
+- **Paired four-lane execution:** disjoint checks run through paired banked
+  engines without duplicating the graph.
+- **Fixed-point datapath:** production posteriors are signed 11-bit values and
+  Stage-1 messages use five-bit sign/magnitude representation.
+- **Rejection-only residual hash:** a 20-bit projection can reject candidates
+  early, but never replaces exact 936-check replay.
+- **Streaming pipeline:** tagged RAM responses, valid masks, and two-level
+  minimum tournaments remove avoidable memory bubbles and serial min cones.
 
-### 3. Static four-bank schedule and address compression
+The compiler-produced topology statistics are tracked in
+[`artifacts/paper_gross144_s1_templates_p002/summary.json`](artifacts/paper_gross144_s1_templates_p002/summary.json),
+and the generated ROM contract is recorded in
+[`images/manifest.json`](images/manifest.json).
 
-The compiler assigns each of 122 orbits a color and uses
-`(orbit_color + x) mod 4` for physical banking. Translation only rotates bank
-names, so runtime conflict search and a large variable-address mux are removed.
+## Physical-board results
 
-- Maximum S1 template degree: 35 edges.
-- Four-bank schedule: at most 9 four-edge beats per check.
-- Largest per-bank address space: `122 x 18 = 2,196` entries, instead of a
-  general roughly 9k-entry variable table.
-- Four native posterior banks and explicit dual-port routing replace broad
-  dynamic address fanout.
+The authoritative release runs used basis-specific SRAM-programmed production
+images on a Tang Nano 20K at `p=0.002`.
 
-Status: `Production`.
-
-### 4. Compressed check state and paired lanes
-
-Per-check edge history is replaced by `min1`, `min2`, `argmin`, sign bits,
-and validity state. The current production record is narrow enough for the
-three-BSRAM compressed-record plan. Two checks with disjoint component-variable
-sets are paired and run through two lockstep four-bank engines, giving four
-parallel lanes without duplicating the graph.
-
-This changes the implementation from a general edge-message store to compact
-check records plus four banked posterior stores. It also halves the paired
-check-update time in the validated architecture.
-
-Status: `Production`.
-
-### 5. 32-bit residual hash to a 20-bit equivariant gate
-
-The exact 32-bit residual hash is formed from complete translation-equivariant
-rotation blocks. The FPGA keeps a 20-bit projection, removing 12 bits (37.5%)
-from the resident hash state while preserving translation structure.
-
-The 20-bit value is rejection-only, never an acceptance certificate. Exact
-936-check replay remains authoritative, so hash collisions can cost latency
-but cannot certify a wrong candidate.
-
-Status: `Production`.
-
-### 6. Streaming pipeline and bounded S1 work
-
-Capture/prepare/reduce stages, tagged synchronous-RAM responses, per-beat
-valid masks, and a two-level four-way minimum tournament remove RAM bubbles
-and long serial min-selection cones.
-
-| Work measure | Before | After | Reduction |
-| --- | ---: | ---: | ---: |
-| Certified RTL replay | 40,681 cycles | 32,618 cycles | 19.8% |
-| Former baseline to final replay | 94,320 cycles | 32,618 cycles | 65.4% |
-| Primary sweep cap | 30 | 10 | 66.7% |
-| Full configured S1 cap | 120 | 84 | 30.0% |
-| Modeled four-bank primary rate at 45 MHz | 1,016/s | 3,049/s | 3.0x |
-
-Status: cycle reductions are validated in RTL/model work; current 40.5 MHz
-board captures report 1.202–1.220 ms FPGA mean core time. The prior 51 MHz
-captures are retained only as historical comparison.
-
-### 7. Compressed streamed S2 working set
-
-The full Paper S2 graph is 67,824 variables, 1,728 checks, and 391,464 edges.
-The streamed quotient uses 942 variable orbits for X (941 for Z), keeps at
-most 9,432 live posterior variables, and retires decisions into a one-bit
-correction bitmap. No full edge-message image is kept on chip.
-
-| S2 representation | X | Z |
+| Metric | X 300k | Z 300k |
 | --- | ---: | ---: |
-| Explicit topology | 6,654,888 bits | 6,652,440 bits |
-| Quotient/template topology | 114,287 bits | 114,230 bits |
-| Topology compression | 58.23x | 58.24x |
-| On-chip working set | 287,591 bits / 16 BRAM blocks | 287,462 bits / 16 BRAM blocks |
-| Resident logical projection | 2 BRAM blocks | 1 BRAM block |
+| Shots | 300,000 | 300,000 |
+| Endpoint logical failures | **0** | **0** |
+| Parser CRC errors | 0 | 0 |
+| Parser format errors | 0 | 0 |
+| Serial reconnects | 0 | 0 |
+| FPGA defers | 13,118 | 12,284 |
+| FPGA fast-path fraction | `95.63%` | `95.91%` |
+| C-tail accepts / defers | 13,118 / 13,118 | 12,284 / 12,284 |
+| One-sided 95% block-LER upper bound | `9.9857e-6` | `9.9857e-6` |
 
-Status: `Model`. This is the compressed streamed-S2 design behind the host
-tail work, not a claim that S2R is currently resident on the board.
+Both bases meet the `1e-5` statistical block-LER target. Endpoint latency is
+reported as an order-ms performance metric; there is no fixed sub-ms release
+gate.
 
-### 8. S2R message packing and neutral-component compression
+### Latency
 
-The software/SDRAM model packs two seven-bit signed Relay messages into one
-16-bit halfword instead of wasting a full halfword per message.
+| Metric | X | Z |
+| --- | ---: | ---: |
+| Mean FPGA core | `1.220 ms` | `1.202 ms` |
+| FPGA p99 core | `2.829 ms` | `2.828 ms` |
+| Mean FPGA board wall time | `16.444 ms` | `16.519 ms` |
+| Mean C tail when invoked | `35.642 ms` | `26.672 ms` |
+| Mean hybrid core | `2.778 ms` | `2.294 ms` |
+| p99 hybrid core | `11.511 ms` | `12.046 ms` |
+| Mean endpoint wall time | `18.003 ms` | `17.611 ms` |
+| p99 endpoint wall time | `25.404 ms` | `26.005 ms` |
 
-| X dynamic S2R layout | Before | Packed | Reduction |
-| --- | ---: | ---: | ---: |
-| Message layout | 1,054,224 bytes | 662,760 bytes | 37.1% |
-| Ideal words per Relay iteration | 850,752 | 557,154 | 34.5% |
+### Timing-clean images
 
-Terminal logical-neutral completion adds a rank-66 bridge for 72 detached
-components using a 22,326-bit immutable plan, modeled as two reusable BRAM
-blocks. The bridge fixes disconnected syndrome components without changing
-logical coset, so it is a bounded state addition rather than a full graph
-expansion. Neutral completion reduced seven hard-trap Relay work from 111 to
-70 iterations (36.9%) in the model.
+The canonical build checks the generated `.fs`, place-and-route report,
+timing-path report, ROM provenance, and SHA-256. It rejects negative setup or
+hold slack.
 
-Status: `Model`; packed S2R is not the current board datapath.
+| Basis | Logic | BSRAM | Requested | Achieved Fmax | Setup / hold slack | Release bitstream SHA-256 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| X | 19,773 / 20,736 (`96%`) | 39 / 46 (`85%`) | 40.500 MHz | 40.533 MHz | `+0.020 / +0.202 ns` | `A875EACB...E28303` |
+| Z | 19,850 / 20,736 (`96%`) | 39 / 46 (`85%`) | 40.500 MHz | 41.445 MHz | `+0.563 / +0.077 ns` | `A74BBA39...96FFB8` |
 
-### 9. Resident C tail instead of per-shot high-level fallback
+Complete hashes and capture provenance are in
+[`reports/release_evidence.json`](reports/release_evidence.json). Historical
+source/top identifiers containing `_51` are retained for Gowin compatibility;
+the production clock is 40.5 MHz.
 
-The rare defer path was reduced from selectable Python/vectorized/native/WSL
-fallback behavior to one persistent C worker. The worker uses a quotient image,
-cached gamma tables, no Python/NumPy allocation in its hot loop, a 32-set fast
-pass, bounded 240-set fallback, and a four-candidate portfolio.
+## Harness throughput status
 
-Status: `Production`. The default fast-first C tail is equivalence-clean on
-1,016 X and 973 Z hardware-deferred syndromes. In the authoritative 300k board
-runs, mean C-tail handoff latency was 35.64 ms (X) and 26.67 ms (Z).
+The board campaign harness now batches Stim sampling, vectorizes syndrome and
+observable packing, uses nonblocking VCP reads, and optionally opens the FTDI
+D2XX transport directly with `--transport d2xx`.
 
-## Current architecture
+A 256-shot run on the attached board measured:
 
-```text
-Stim/Relay shot
-    -> host packs 936 detector bits into 117 UART bytes
-    -> FPGA four-lane Paper S1W at 40.5 MHz release target
-       -> common-case logical word
-       -> rare defer with full syndrome already held by host
-    -> persistent C Relay-lite tail
-    -> endpoint logical word and exact-syndrome status
-```
+| Metric | Result |
+| --- | ---: |
+| Throughput | `58.85 shots/s` |
+| Mean FPGA core | `1.228 ms` |
+| Mean wall time | `16.945 ms` |
+| P99 wall time | `17.727 ms` |
+| UART response | 11-byte compact result |
 
-## Reproduce and verify
+Host packing is approximately 3 microseconds per shot. The remaining gap to
+hundreds of shots/s is the FT2232C/Windows first-response delay of roughly
+15–16 ms, not the sampler, packer, or decoder core. Reaching hundreds/s needs a
+buffered multi-shot FPGA protocol or a different USB transport; the current
+board is already at approximately 96% logic and 99% CLS utilization.
 
-Portable development requires Python 3.11+ plus Icarus Verilog and Verilator
-for RTL checks. Install the Python dependencies and run the portable suite:
+## Stage-2 architecture work
+
+Stage-2 work remains in the software/model path and is not claimed as resident
+on the current board:
+
+- streamed Stage-2 quotient with approximately 58.2x topology compression;
+- packed seven-bit S2R message layouts;
+- bounded logical-neutral component completion;
+- software/SDRAM bandwidth models and integration experiments.
+
+The X streamed quotient uses 942 variable orbits, keeps at most 9,432 live
+posterior variables, and retires decisions into a one-bit correction bitmap.
+The packed S2R message layout reduces the modeled X dynamic layout by 37.1%.
+
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `rtl/` | Production SystemVerilog datapath, memories, protocol, and Tang Nano top |
+| `python/gross144_decoder/` | Graph compiler, reference decoders, fixed-point models, host integration |
+| `images/` | Frozen production ROMs and image manifest |
+| `artifacts/` | Compiler-generated Gross144 quotient/template artifacts |
+| `tests/` | Python reference/integration tests and RTL testbench |
+| `tools/` | Relay bootstrap, image export, Gowin build/flash, board campaigns, C-tail tooling |
+| `reports/` | Board benchmark summaries and machine-readable release evidence |
+| `docs/` | Production contract, architecture, numeric format, and verification notes |
+
+The `python/gross144_decoder/` package and `GROSS144_*` environment/schema
+identifiers are the public interfaces for scripts and captured evidence.
+
+## Reproduce software and RTL checks
+
+Requirements: Python 3.11+, Git, Icarus Verilog, and Verilator.
 
 ```bash
 python -m pip install -r requirements.txt
 python -m pip install -e .
+python tools/bootstrap_relay.py
 python -m pytest tests -q
 make test-rtl-recovery
 make lint
 ```
 
-The public Relay-BP Gross144 fixture is deliberately not vendored. Fetch and
-verify the exact pinned checkout used by this project:
-
-```bash
-python tools/bootstrap_relay.py
-python -m pytest tests -q
-```
-
-The bootstrap script checks out Relay-BP commit
+`tools/bootstrap_relay.py` checks out Relay-BP commit
 `19d7023d476248858fc01bdf087ce673feaa4ef4` under ignored `build/relay` and
-verifies the expected Stim fixture hashes before tests or image regeneration
-use it.
+verifies the pinned Gross144 Stim fixture hashes.
 
-GitHub Actions runs Python 3.11/3.12 tests, the pinned-fixture contract, Icarus
-RTL recovery simulation, and Verilator lint. Gowin place-and-route and the
-large-shot endpoint proof remain hardware operations; CI is not presented as a
-substitute for board evidence.
+## Build, flash, and run the board endpoint
 
-### Board build and proof
-
-Requirements: Windows 11, Python 3.11+, Gowin EDA, WSL2 with GCC/OpenMP, a
-Tang Nano 20K, and the packages in `requirements.txt`.
-
-Set a non-default Gowin installation path if needed:
+Board reproduction assumes Windows 11, Gowin EDA, WSL2 with GCC/OpenMP for
+the persistent C tail, a Tang Nano 20K, and the Python dependencies above.
 
 ```powershell
 $env:GOWIN_HOME = 'C:\Gowin\Gowin_V1.9.11.03_Education_x64'
-```
-
-Bootstrap the pinned Relay fixture, build, and program volatile SRAM:
-
-```powershell
 python tools\bootstrap_relay.py
 powershell -ExecutionPolicy Bypass -File tools\build_board.ps1 -Basis X
 powershell -ExecutionPolicy Bypass -File tools\flash_gowin.ps1 -Basis X -Mode sram
 ```
 
-Run smoke or a full proof campaign:
+Run a smoke test or full release campaign:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\run_board_proof.ps1 `
   -Port COM6 -Basis X -Shots 100 -Smoke
+
 powershell -ExecutionPolicy Bypass -File tools\run_board_proof.ps1 `
   -Port COM6 -Basis X -Shots 300000
 ```
 
-Repeat for basis `Z`. SPI flash requires explicit `-Mode flash`; the flash
-wrapper accepts only the exact basis-specific production bitstream by default.
+Repeat with `-Basis Z` for the Z image. SRAM programming is the default safe
+workflow; SPI flash requires explicit `-Mode flash`.
 
 Generated Gowin projects, ROMs, bitstreams, raw captures, and benchmark output
-live under ignored `build/`. The repository tracks compact machine-readable
-release evidence in [`reports/release_evidence.json`](reports/release_evidence.json)
-instead of committing the large raw campaign files.
+live under ignored `build/`. Compact release provenance is tracked in
+[`reports/release_evidence.json`](reports/release_evidence.json) rather than
+committing large campaign files.
 
-## References and attribution
+## Release evidence and references
 
-MITTEN builds on public work on bivariate-bicycle qLDPC codes and Relay-BP.
-See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the pinned Relay-BP
-fixture, papers, public Gross-code reference, and license/provenance notes.
+- [`docs/PRODUCTION_PATH.md`](docs/PRODUCTION_PATH.md) — board/software endpoint
+  contract.
+- [`reports/HEADLINE_BENCHMARKS.md`](reports/HEADLINE_BENCHMARKS.md) — readable
+  physical-board evidence.
+- [`reports/release_evidence.json`](reports/release_evidence.json) — capture,
+  timing, bitstream, and SHA-256 provenance.
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) — pinned fixtures,
+  licenses, and external references.
+
+External references include Relay-BP, the Gross/bivariate-bicycle code data,
+and the papers listed in `THIRD_PARTY_NOTICES.md`.
 
 ## License
 
-MITTEN is released under the Apache License 2.0. See [`LICENSE`](LICENSE).
+Gross144 FPGA Decoder is released under the Apache License 2.0. See
+[`LICENSE`](LICENSE).

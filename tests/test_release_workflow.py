@@ -7,18 +7,18 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.gari import GariGraph  # noqa: E402
-from mitten.graph_model import Graph, GroupActionMetadata  # noqa: E402
-from mitten.automorphism import select_decorrelated_group_trials  # noqa: E402
-from mitten.hybrid_warmup import WarmupConfig  # noqa: E402
-from mitten.relay_reference import RelayConfig, RelayLegConfig  # noqa: E402
-from mitten.release_workflow import (  # noqa: E402
+from gross144_decoder.gari import GariGraph  # noqa: E402
+from gross144_decoder.graph_model import Graph, GroupActionMetadata  # noqa: E402
+from gross144_decoder.automorphism import select_decorrelated_group_trials  # noqa: E402
+from gross144_decoder.hybrid_warmup import WarmupConfig  # noqa: E402
+from gross144_decoder.relay_reference import RelayConfig, RelayLegConfig  # noqa: E402
+from gross144_decoder.release_workflow import (  # noqa: E402
     ReleaseWorkflowConfig,
     run_release_workflow,
 )
-from mitten.stage2_integration import Stage2Cache  # noqa: E402
-from mitten.telescope import Stage, StageStatus  # noqa: E402
-from mitten.unified_stage_controller import GraphType  # noqa: E402
+from gross144_decoder.stage2_integration import Stage2Cache  # noqa: E402
+from gross144_decoder.telescope import Stage, StageStatus  # noqa: E402
+from gross144_decoder.unified_stage_controller import GraphType  # noqa: E402
 
 
 def triangle_group(graph: Graph) -> GroupActionMetadata:

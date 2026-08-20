@@ -1,4 +1,4 @@
-// MITTEN Gross144 streamed S2R CPU tail.
+// Gross144 streamed S2R CPU tail.
 //
 // Standalone C11 worker.  No floating point, no per-shot graph expansion,
 // no Python/NumPy allocation in hot loop.  Image is quotient-compiled by
@@ -947,30 +947,30 @@ int main(int argc, char **argv) {
     }
     Config configs[MAX_CONFIGS];
     configs_for_basis(is_z, configs);
-    if (!env_u32_exact("MITTEN_C_TAIL_RELAY_SETS", RELAY_LITE_SETS,
+    if (!env_u32_exact("GROSS144_C_TAIL_RELAY_SETS", RELAY_LITE_SETS,
                        1, RELAY_SET_COUNT_MAX, &g_relay_lite_sets) ||
-        !env_u32_exact("MITTEN_C_TAIL_RELAY_FALLBACK_SETS",
+        !env_u32_exact("GROSS144_C_TAIL_RELAY_FALLBACK_SETS",
                        RELAY_LITE_FALLBACK_SETS, 1, RELAY_SET_COUNT_MAX,
                        &g_relay_lite_fallback_sets) ||
-        !env_u32_exact("MITTEN_C_TAIL_RELAY_PRE", RELAY_LITE_PRE,
+        !env_u32_exact("GROSS144_C_TAIL_RELAY_PRE", RELAY_LITE_PRE,
                        0, RELAY_PRE_MAX, &g_relay_lite_pre) ||
-        !env_u32_exact("MITTEN_C_TAIL_RELAY_SET_ITERS", RELAY_LITE_SET_ITERS,
+        !env_u32_exact("GROSS144_C_TAIL_RELAY_SET_ITERS", RELAY_LITE_SET_ITERS,
                        1, RELAY_SET_MAX, &g_relay_lite_set_iters) ||
-        !env_u32_exact("MITTEN_C_TAIL_RELAY_STOP", RELAY_LITE_STOP,
+        !env_u32_exact("GROSS144_C_TAIL_RELAY_STOP", RELAY_LITE_STOP,
                        0, RELAY_STOP_MAX, &g_relay_lite_stop)) {
         free(target);
         for (int i = 0; i < MAX_CONFIGS; ++i) free_scratch(&scratches[i]);
         free_image(&image); return 7;
     }
     if (g_relay_lite_fallback_sets < g_relay_lite_sets) {
-        fprintf(stderr, "MITTEN_C_TAIL_RELAY_FALLBACK_SETS must be >= RELAY_SETS\n");
+        fprintf(stderr, "GROSS144_C_TAIL_RELAY_FALLBACK_SETS must be >= RELAY_SETS\n");
         free(target);
         for (int i = 0; i < MAX_CONFIGS; ++i) free_scratch(&scratches[i]);
         free_image(&image); return 7;
     }
-    g_skip_relay = env_bool("MITTEN_C_TAIL_SKIP_RELAY");
-    g_relay_only = env_bool("MITTEN_C_TAIL_RELAY_ONLY");
-    g_relay_escape_only = env_bool("MITTEN_C_TAIL_RELAY_ESCAPE_ONLY");
+    g_skip_relay = env_bool("GROSS144_C_TAIL_SKIP_RELAY");
+    g_relay_only = env_bool("GROSS144_C_TAIL_RELAY_ONLY");
+    g_relay_escape_only = env_bool("GROSS144_C_TAIL_RELAY_ESCAPE_ONLY");
     int16_t *gamma_primary = build_relay_gamma_table(
         &image, RELAY_LITE_PRIMARY_SEED);
     int16_t *gamma_escape = build_relay_gamma_table(
@@ -980,14 +980,14 @@ int main(int argc, char **argv) {
         for (int i = 0; i < MAX_CONFIGS; ++i) free_scratch(&scratches[i]);
         free_image(&image); return 6;
     }
-    const char *fast_first_env = getenv("MITTEN_C_TAIL_FAST_FIRST");
+    const char *fast_first_env = getenv("GROSS144_C_TAIL_FAST_FIRST");
     const int fast_first = fast_first_env &&
         (strcmp(fast_first_env, "1") == 0 ||
          strcmp(fast_first_env, "TRUE") == 0 ||
          strcmp(fast_first_env, "true") == 0);
     int first_config = only_config >= 0 ? only_config : 0;
     uint32_t portfolio_limit_u32 = 0;
-    if (!env_u32_exact("MITTEN_C_TAIL_PORTFOLIO_LIMIT",
+    if (!env_u32_exact("GROSS144_C_TAIL_PORTFOLIO_LIMIT",
                        DEFAULT_PORTFOLIO_LIMIT, 1, MAX_CONFIGS,
                        &portfolio_limit_u32)) {
         free(gamma_primary); free(gamma_escape); free(target);

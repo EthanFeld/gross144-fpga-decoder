@@ -5,15 +5,15 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.automorphism import (  # noqa: E402
+from gross144_decoder.automorphism import (  # noqa: E402
     AutomorphismConfig,
     AutomorphismTrial,
     identity_and_cyclic_trials,
     run_automorphism_ensemble,
     transform_graph,
 )
-from mitten.graph_model import Graph  # noqa: E402
-from mitten.minsum_reference import layered_min_sum  # noqa: E402
+from gross144_decoder.graph_model import Graph  # noqa: E402
+from gross144_decoder.minsum_reference import layered_min_sum  # noqa: E402
 
 
 class AutomorphismTests(unittest.TestCase):

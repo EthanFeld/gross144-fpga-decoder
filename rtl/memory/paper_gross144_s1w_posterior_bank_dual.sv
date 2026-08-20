@@ -30,7 +30,7 @@ module paper_gross144_s1w_posterior_bank_dual #(
     assign write_conflict = port0_write_en && port1_write_en &&
                             (port0_write_addr == port1_write_addr);
 
-`ifndef MITTEN_SIM
+`ifndef GROSS144_SIM
     // Use the native 16-bit DPB organization used by the original working
     // posterior store.  One DPB provides two independent ports; three
     // 1024-word segments cover all 2,196 logical entries.  In 16-bit mode

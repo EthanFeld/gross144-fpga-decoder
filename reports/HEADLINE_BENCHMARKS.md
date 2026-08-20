@@ -69,9 +69,3 @@ The FPGA's residual hash is never an acceptance certificate. Exact full
 936-check replay decides FPGA acceptance; a hard or ambiguous case defers to
 the C tail with the full 1,728-bit syndrome already retained on the host.
 
-## Historical development failures
-
-Pre-release images exposed board-only logical/projection defects and one
-host-side COM6 interruption. Those cases motivated the exact-replay,
-terminal-defer, and serial-recovery changes in the current path. They are not
-open release gates and are not mixed into the final release statistics above.

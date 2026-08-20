@@ -50,10 +50,10 @@ $generatorInputs = @(
 )
 foreach ($dependency in @(
     'tools\export_paper_gross144_s1w_sv_image.py',
-    'python\mitten\paper_gross144.py',
-    'python\mitten\paper_gross144_component_templates.py',
-    'python\mitten\paper_gross144_hash.py',
-    'python\mitten\wide_minsum.py'
+    'python\gross144_decoder\paper_gross144.py',
+    'python\gross144_decoder\paper_gross144_component_templates.py',
+    'python\gross144_decoder\paper_gross144_hash.py',
+    'python\gross144_decoder\wide_minsum.py'
 )) {
     $dependencyPath = Join-Path $root $dependency
     $generatorInputs += "$dependency=$((Get-FileHash -LiteralPath $dependencyPath -Algorithm SHA256).Hash.ToLowerInvariant())"
@@ -93,7 +93,7 @@ if ($imageStale) {
         }
     }
     [ordered]@{
-        schema = 'MITTEN-FPGA-IMAGE-PROVENANCE-V1'
+        schema = 'GROSS144-FPGA-IMAGE-PROVENANCE-V1'
         generator_sha256 = $generatorHash
         inputs = $generatorInputs
         basis = $Basis
@@ -106,7 +106,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $imageOutput 'meta.memb') -PathType 
 if (-not (Test-Path -LiteralPath $imageProvenance -PathType Leaf)) {
     throw "Generated FPGA image provenance missing: $imageProvenance"
 }
-$env:MITTEN_BASIS = $Basis
+$env:GROSS144_BASIS = $Basis
 Push-Location $root
 try {
     & $gwSh (Join-Path $root 'tools\gowin_paper_gross144_s1w_four_lane_uart.tcl')

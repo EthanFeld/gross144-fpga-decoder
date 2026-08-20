@@ -9,7 +9,6 @@ cycles but can never change decoder correctness or LER.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
 from typing import Mapping, Sequence
 
 
@@ -17,6 +16,16 @@ TIME_SLICES = 13
 GROUP_ORDER = 72
 ORBIT_COUNT = 122
 HASH_WIDTH = 32
+
+# Frozen deterministic words.  Keeping these explicit preserves the published
+# ROM image and board evidence while avoiding a project-specific namespace in
+# the public source.
+_TIME_BASES = (
+    0xA6EE738E, 0xED0E7810, 0x0740C90F, 0x9B580CC5,
+    0x776DCB77, 0xBDF0C458, 0x5703B1EB, 0xC26B737D,
+    0x1EA63094, 0xC4364208, 0x4491C472, 0xAF85198C,
+    0x13C99BBC,
+)
 
 
 def add_coordinates(left: int, right: int) -> int:
@@ -56,13 +65,7 @@ def transform_hash(value: int, coordinate: int) -> int:
 def fixed_time_bases() -> tuple[int, ...]:
     """Return deterministic independently-derived time-type base words."""
 
-    return tuple(
-        int.from_bytes(
-            hashlib.sha256(f"MITTEN_GROSS144_HASH_V1:{time}".encode("ascii")).digest()[:4],
-            "little",
-        )
-        for time in range(TIME_SLICES)
-    )
+    return _TIME_BASES
 
 
 def gf2_word_rank(words: Sequence[int], *, width: int = HASH_WIDTH) -> int:

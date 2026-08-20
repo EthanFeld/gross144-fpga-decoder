@@ -5,9 +5,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.graph_model import Graph  # noqa: E402
-from mitten.minsum_reference import FixedDecodeResult  # noqa: E402
-from mitten.relay_reference import (  # noqa: E402
+from gross144_decoder.graph_model import Graph  # noqa: E402
+from gross144_decoder.minsum_reference import FixedDecodeResult  # noqa: E402
+from gross144_decoder.relay_reference import (  # noqa: E402
     RelayConfig,
     RelayLegConfig,
     RelayStatus,

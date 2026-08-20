@@ -8,14 +8,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.paper_gross144 import (
+from gross144_decoder.paper_gross144 import (
     PaperGross144Stage1Config,
     PaperGross144Stage1FpgaAdapter,
     full_paper_dem_profile,
     load_paper_gross144_stage1_layout,
     rtl_cycle_model,
 )
-from mitten.paper_gross144_component_templates import (  # noqa: E402
+from gross144_decoder.paper_gross144_component_templates import (  # noqa: E402
     compile_paper_stage1_component_templates,
     paper_stage1_cycle_plan,
     paper_stage1_storage_plan,

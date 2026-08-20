@@ -5,7 +5,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
-from mitten.protocol import (  # noqa: E402
+from gross144_decoder.protocol import (  # noqa: E402
     Command, DuplicateCache, Frame, FrameParser, decode_frame, encode_frame,
 )
 

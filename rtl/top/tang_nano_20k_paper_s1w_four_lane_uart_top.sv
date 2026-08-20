@@ -4,8 +4,15 @@
 // board's 27 MHz oscillator. Command 0x31 carries the 936 detector bits as 117
 // little-endian packed bytes. A stop-and-wait CDC snapshot feeds the
 // 40.5 MHz production decoder without including transport time in `cycle_count`.
+// Decode responses carry the compact 11-byte result payload. Keep transport
+// bytes out of the measured decoder result and avoid padding the UART tail.
 module tang_nano_20k_paper_s1w_four_lane_uart_top #(
-    parameter integer BASIS_ID = 0
+    parameter integer BASIS_ID = 0,
+    // Production wrappers enable a continuous idle byte stream. It keeps
+    // the FTDI RX endpoint packetized during the decoder's ~1 ms compute
+    // interval, avoiding a latency-timer wait on each short result frame.
+    // Simulation defaults off so the UART response monitor sees only frames.
+    parameter integer IDLE_FILL = 0
 ) (
     input  logic clk27,
     input  logic rst_n,
@@ -22,7 +29,7 @@ module tang_nano_20k_paper_s1w_four_lane_uart_top #(
     logic clk51, pll_locked;
     logic [1:0] core_reset_sync = 2'b11;
     logic core_rst, uart_rst;
-    mitten_clock_51 u_clock (
+    gross144_clock_51 u_clock (
         .clk27(clk27), .clk51(clk51), .locked(pll_locked)
     );
     // Pin 88 (`rst_n`) is physically low on the attached board even when no
@@ -60,6 +67,7 @@ module tang_nano_20k_paper_s1w_four_lane_uart_top #(
     logic [7:0] uart_rx_data;
     logic uart_tx_start, uart_tx_busy;
     logic [7:0] uart_tx_data;
+    logic [7:0] frame_tx_data;
     uart_rx #(.CLK_HZ(27_000_000), .BAUD(3_000_000)) u_uart_rx (
         .clk(clk27), .rst(uart_rst), .rx(uart_rx_pin),
         .data_valid(uart_rx_valid), .data(uart_rx_data)
@@ -95,10 +103,19 @@ module tang_nano_20k_paper_s1w_four_lane_uart_top #(
         .tx_command(frame_tx_command), .tx_sequence(frame_tx_sequence),
         .tx_length(frame_tx_length), .tx_payload(frame_tx_payload),
         .tx_busy(frame_tx_busy), .tx_valid(frame_tx_valid),
-        .tx_ready(frame_tx_ready), .tx_data(uart_tx_data)
+        .tx_ready(frame_tx_ready), .tx_data(frame_tx_data)
     );
     assign frame_tx_ready = !uart_tx_busy;
-    assign uart_tx_start = frame_tx_valid && frame_tx_ready;
+    // The framer retains its current byte until the UART accepts it. When no
+    // frame is pending, insert inert bytes at line rate. The host parser
+    // discards them while retaining MT-prefixed response frames.
+    wire frame_uart_start = frame_tx_valid && frame_tx_ready;
+    wire idle_fill_start = IDLE_FILL && !frame_tx_busy &&
+                           !frame_tx_valid && !uart_tx_busy;
+    assign uart_tx_start = frame_uart_start || idle_fill_start;
+    always_comb begin
+        uart_tx_data = frame_uart_start ? frame_tx_data : 8'h00;
+    end
 
     logic payload_read_en;
     logic [6:0] payload_read_addr;
@@ -462,7 +479,7 @@ module tang_nano_20k_paper_s1w_four_lane_uart_fast_51_top (
     output logic uart_tx_pin, output logic led
 );
     tang_nano_20k_paper_s1w_four_lane_uart_top #(
-        .BASIS_ID(0)
+        .BASIS_ID(0), .IDLE_FILL(0)
     ) u_top (.*);
 endmodule
 
@@ -473,6 +490,6 @@ module tang_nano_20k_paper_s1w_four_lane_uart_fast_z_51_top (
     output logic uart_tx_pin, output logic led
 );
     tang_nano_20k_paper_s1w_four_lane_uart_top #(
-        .BASIS_ID(1)
+        .BASIS_ID(1), .IDLE_FILL(0)
     ) u_top (.*);
 endmodule
