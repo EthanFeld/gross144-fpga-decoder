@@ -15,26 +15,24 @@ order-ms, no sub-ms gate.
 
 | Board capture | Shots | Endpoint failures | Point LER | One-sided 95% upper bound | FPGA mean | Endpoint mean | C tail mean |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| X release candidate | 30,000 | 0 | 0 | `9.9853e-5` | `1.221 ms` | `2.687 ms` | `34.24 ms` |
+| X 300k statistical run | 300,000 | 0 | 0 | `9.9857e-6` | `1.220 ms` | `2.778 ms` | `35.64 ms` |
 | Z 300k statistical run | 300,000 | 0 | 0 | `9.9857e-6` | `1.202 ms` | `2.294 ms` | `26.67 ms` |
 
-X 30k bound remains above `1e-5`; Z 300k bound passes target. Endpoint latency
-is dominated by CPU tail, but remains acceptable at order-ms scale.
-Both 30,000-shot validation runs were clean. Z then completed 300,000 shots
-with no endpoint, transport, parser, or decoder errors; all 12,284 Z defers
-were accepted by the C tail.
+Both X/Z 300k runs pass statistical LER target: zero endpoint, transport,
+parser, or decoder errors; all 25,402 C-tail defers were accepted. Endpoint
+latency is dominated by CPU tail, remains acceptable at order-ms scale.
 
 Paper comparison numbers supplied for this target:
 
 | Metric | Paper reference | Current board evidence |
 | --- | ---: | ---: |
-| Block LER | `1.9e-6` | Z: `<= 9.9857e-6` at 300k; X: `<= 9.9853e-5` at 30k |
+| Block LER | `1.9e-6` | X/Z: `<= 9.9857e-6` at 300k |
 | LER / syndrome-extraction round | `1.6e-7` | not established on board |
 | LER / round / logical qubit | `1.3e-8` | not established on board |
 
-Z meets statistical LER target at 300,000 shots. X 300,000 proof remains open
-after host-side COM6 interruption. Z endpoint is `2.294 ms`, accepted as
-order-ms performance; latency remains reported, not pass/fail.
+X/Z meet statistical LER target at 300,000 shots. X endpoint is `2.778 ms`,
+Z `2.294 ms`; both accepted as order-ms performance. Latency remains reported,
+not pass/fail.
 
 ## Build status
 
@@ -140,7 +138,7 @@ and long serial min-selection cones.
 | Modeled four-bank primary rate at 45 MHz | 1,016/s | 3,049/s | 3.0x |
 
 Status: cycle reductions are validated in RTL/model work; current 40.5 MHz
-board captures report 1.235–1.255 ms FPGA mean core time. The prior 51 MHz
+board captures report 1.202–1.220 ms FPGA mean core time. The prior 51 MHz
 captures are retained only as historical comparison.
 
 ### 7. Compressed streamed S2 working set
