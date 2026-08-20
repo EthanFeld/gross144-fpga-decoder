@@ -3,7 +3,7 @@
 // UART uses the repository MT/CRC32 frame format at an exact 3 Mbaud from the
 // board's 27 MHz oscillator. Command 0x31 carries the 936 detector bits as 117
 // little-endian packed bytes. A stop-and-wait CDC snapshot feeds the
-// 51 MHz decoder without including transport time in `cycle_count`.
+// 40.5 MHz production decoder without including transport time in `cycle_count`.
 module tang_nano_20k_paper_s1w_four_lane_uart_top #(
     parameter integer BASIS_ID = 0
 ) (
@@ -455,7 +455,8 @@ module tang_nano_20k_paper_s1w_four_lane_uart_top #(
                  result_toggle_core;
 endmodule
 
-// Production X image: 51 MHz four-lane S1W with bounded fast handoff.
+// Production X image: timing-clean 40.5 MHz four-lane S1W with bounded fast handoff.
+// The `_51` top name is retained for historical Gowin/project compatibility.
 module tang_nano_20k_paper_s1w_four_lane_uart_fast_51_top (
     input logic clk27, input logic rst_n, input logic uart_rx_pin,
     output logic uart_tx_pin, output logic led
@@ -465,7 +466,8 @@ module tang_nano_20k_paper_s1w_four_lane_uart_fast_51_top (
     ) u_top (.*);
 endmodule
 
-// Production Z image: same datapath with the Z-basis logical image.
+// Production Z image: same timing-clean 40.5 MHz datapath with the Z-basis logical image.
+// The `_51` top name is retained for historical Gowin/project compatibility.
 module tang_nano_20k_paper_s1w_four_lane_uart_fast_z_51_top (
     input logic clk27, input logic rst_n, input logic uart_rx_pin,
     output logic uart_tx_pin, output logic led

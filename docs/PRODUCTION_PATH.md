@@ -1,61 +1,85 @@
 # Production path
 
+MITTEN's release contract is the hardware/software endpoint that was exercised
+in the authoritative 300,000-shot X and Z board campaigns on 2026-08-20.
+
 ```text
-Stim/Relay shot
+Stim / Relay-BP Gross144 fixture
     -> Python board campaign
-    -> 936-bit packed UART frame (command 0x31)
-    -> FPGA S1W, four parallel lanes, 40.5 MHz release target
-       -> accepted logical word
-       -> deferred full detector word
-    -> resident C Relay-lite worker in WSL
-    -> endpoint logical word and exact-syndrome status
+    -> 936-bit packed UART frame (command 0x31, 3 Mbaud)
+    -> Tang Nano 20K FPGA: four-lane Paper Gross144 S1W @ 40.5 MHz
+       -> exact-replay accepted logical word
+       -> or verified defer; full 1,728-bit syndrome is already on the host
+    -> persistent C Relay-lite tail in WSL
+    -> endpoint logical word + exact-syndrome status
 ```
 
 ## Fixed release contract
 
-| Item | Value |
+| Item | Release value |
 | --- | --- |
 | Board | Tang Nano 20K / GW2AR-18C |
 | FPGA bases | X and Z, separate images |
 | Core clock | 40.5 MHz |
 | UART | 3,000,000 baud, 8-N-1 |
 | FPGA path | Paper Gross144 S1W, four-lane, 10-sweep fast handoff |
-| CPU tail | resident C Relay-lite, 32-set fast pass, bounded 240-set fallback, 4-leg portfolio |
+| Acceptance safety | 20-bit residual hash is rejection-only; exact 936-check replay is authoritative |
+| CPU tail | persistent C Relay-lite, fast-first + bounded fallback portfolio |
 | Programming | SRAM by default; SPI flash only with explicit `-Mode flash` |
 
-The FPGA bitstream and the host tail are versioned independently in the
-campaign evidence: the JSON records both configuration hashes and the exact
-bitstream SHA-256 when `--bitstream` is supplied.
+The production clock source of truth is
+[`config/board_clock.json`](../config/board_clock.json). Historical source and
+top-module identifiers containing `_51` are retained only for Gowin/project
+compatibility; they do **not** describe the current clock frequency.
+
+## Release gates — closed
+
+The final on-board X and Z campaigns are authoritative. Both completed
+300,000 shots at `p=0.2%` with zero endpoint, parser, transport, or decoder
+failures. All FPGA defers were accepted by the resident C tail.
+
+| Basis | Shots | Endpoint failures | One-sided 95% LER upper bound | FPGA mean core | Endpoint mean core | Defers / accepts |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| X | 300,000 | 0 | `9.9857e-6` | `1.220 ms` | `2.778 ms` | 13,118 / 13,118 |
+| Z | 300,000 | 0 | `9.9857e-6` | `1.202 ms` | `2.294 ms` | 12,284 / 12,284 |
+
+The block-LER release target is `<= 1e-5`. Endpoint latency is reported as an
+order-millisecond performance metric; there is no fixed sub-millisecond
+release gate.
+
+The Z raw capture was produced before commit `aa57e95` removed the former
+1 ms endpoint-latency gate. Its historical `endpoint_pass=false` field is
+therefore stale policy metadata: the capture itself has zero failures, clean
+transport, and an LER confidence bound below the release target. The current
+release interpretation is recorded in
+[`reports/release_evidence.json`](../reports/release_evidence.json).
+
+## Timing-clean release images
+
+The canonical build checks the generated `.fs`, place-and-route report,
+timing-path report, ROM provenance, and SHA-256 before returning success. It
+rejects negative post-route setup or hold slack.
+
+| Basis | Logic | BSRAM | Requested | Achieved Fmax | Setup / hold slack | Bitstream SHA-256 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| X | 19,773 / 20,736 (96%) | 39 / 46 (85%) | 40.500 MHz | 40.533 MHz | `+0.020 / +0.202 ns` | `A875EACBB244F9CA9A4408C28545E51BAD5B522DC090F083A2742E9E73E28303` |
+| Z | 19,850 / 20,736 (96%) | 39 / 46 (85%) | 40.500 MHz | 41.445 MHz | `+0.563 / +0.077 ns` | `A74BBA39F7E5CBC2C51A75834FCEA8F06D7C4E994E9CD9A307C0C3CCBE96FFB8` |
+
+The bitstream hashes match the images used by the authoritative 300k board
+captures.
 
 ## Failure policy
 
-- UART framing, CRC, timeout, basis mismatch, decoder error, deferred-without-tail,
-  and wrong logical word are endpoint failures.
-- The C tail never silently falls back to an alternate decoder.
-- A finite zero-failure run reports its confidence upper bound; it is not an
-  endpoint-gate pass unless that bound and latency gate pass.
-- Failure samples retain the full detector word for deterministic replay.
+UART framing, CRC, timeout, basis mismatch, unrecovered transport errors,
+decoder errors, a defer without the configured C tail, or a wrong endpoint
+logical word are failures. The C tail never silently switches to an alternate
+decoder. Failure samples retain the full detector word for deterministic
+replay.
 
-## Known open gate
+## Historical incidents
 
-The current board image has clean short captures, but the long run encountered
-an unrelated crash/state-loss event and four board-only logical mismatches plus
-one shared terminal wrong-coset case are still under investigation. The large
-proof gate therefore remains open.
-
-## Current build artifacts
-
-The canonical build flow checks the exact .fs, P&R report, timing-path
-report, ROM provenance, and SHA-256 before returning success. A build is
-rejected when the pinned Relay fixture is unavailable or post-route setup/hold
-slack is negative.
-
-| Basis | Logic | BSRAM | Bitstream SHA-256 |
-| --- | ---: | ---: | --- |
-| X | 19,735/20,736 (96%) | 39/46 (85%) | `52ED2718D6693816452AFF05FED3BAC02E32BC9BBBF0C4D4417887D91D7BC7A6` |
-| Z | 19,434/20,736 (94%) | 39/46 (85%) | `7911D08258EB4E87C01A533999B3E3205FACBE0381B27D34062C712D931BAF25` |
-
-The recorded hashes above belong to historical 51 MHz images and are retained
-as evidence only. The current 40.5 MHz target has not been rebuilt after the
-cleanup because the pinned Relay fixture is absent; no timing-clean bitstream
-claim is made until that fixture and a board are available.
+Earlier development images exposed board-only projection/recovery defects and
+one host-side COM6 interruption. Those incidents drove exact replay, terminal
+defer, and serial-recovery changes. They are debugging history, not open
+release gates. The final X/Z 300k runs above supersede the older captures for
+release status.

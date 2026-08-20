@@ -1,12 +1,42 @@
 # MITTEN Gross144 board endpoint
 
-MITTEN is a Tang Nano 20K (`GW2AR-18C`) implementation of the Paper Gross144
-S1W decoder. The release path is deliberately narrow: a timing-clean 40.5 MHz FPGA common
-case, 3 Mbaud UART transport, and a resident optimized C Relay-lite tail for
-rare FPGA defers.
+MITTEN is a hardware/software qLDPC decoder prototype for the Gross
+`[[144,12,12]]` bivariate-bicycle code. It maps the common decoding path onto a
+Tang Nano 20K (`GW2AR-18C`) FPGA and sends only rare hard cases to a persistent
+C Relay-lite tail on the host.
 
-Supported images are basis `X` and basis `Z`. Historical B3, H03, probe,
-alternate-clock, and Open975 paths are not release interfaces.
+The project is primarily an FPGA architecture and verification exercise: it
+compresses the Paper Gross144 S1 topology by **44.3x**, schedules the decoder
+across four banked lanes, uses exact syndrome replay as the FPGA acceptance
+certificate, and closes timing at a **40.5 MHz** production clock.
+
+**Release status:** the final physical-board X and Z campaigns each completed
+**300,000 shots at `p=0.2%` with zero endpoint failures**. Their one-sided 95%
+block-LER upper bound is `9.9857e-6`, meeting the `1e-5` release target.
+
+```text
+936 selected detector bits
+        |
+        v
+  Tang Nano 20K FPGA
+  four-lane S1W @ 40.5 MHz
+        | accepted             | verified defer
+        v                      v
+   logical word        full 1,728-bit syndrome on host
+                               |
+                               v
+                       persistent C Relay-lite tail
+                               |
+                               v
+                         endpoint logical word
+```
+
+Supported release images are basis `X` and basis `Z`. Historical B3, H03,
+probe, alternate-clock, and Open975 paths are not release interfaces.
+
+For the release contract and exact evidence provenance, see
+[`docs/PRODUCTION_PATH.md`](docs/PRODUCTION_PATH.md) and
+[`reports/release_evidence.json`](reports/release_evidence.json).
 
 ## Current headline numbers
 
@@ -186,8 +216,8 @@ cached gamma tables, no Python/NumPy allocation in its hot loop, a 32-set fast
 pass, bounded 240-set fallback, and a four-candidate portfolio.
 
 Status: `Production`. The default fast-first C tail is equivalence-clean on
-1,016 X and 973 Z hardware-deferred syndromes; current 20k board means are
-27.3 ms (X) and 32.0 ms (Z) per deferred handoff.
+1,016 X and 973 Z hardware-deferred syndromes. In the authoritative 300k board
+runs, mean C-tail handoff latency was 35.64 ms (X) and 26.67 ms (Z).
 
 ## Current architecture
 
@@ -201,25 +231,57 @@ Stim/Relay shot
     -> endpoint logical word and exact-syndrome status
 ```
 
-## Release workflow
+## Reproduce and verify
 
-Requirements: Windows 11, Python 3.11+, Gowin EDA, WSL2 with GCC/OpenMP,
-Tang Nano 20K, and packages in `requirements.txt`.
+Portable development requires Python 3.11+ plus Icarus Verilog and Verilator
+for RTL checks. Install the Python dependencies and run the portable suite:
 
-Set a non-default Gowin installation path:
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -e .
+python -m pytest tests -q
+make test-rtl-recovery
+make lint
+```
+
+The public Relay-BP Gross144 fixture is deliberately not vendored. Fetch and
+verify the exact pinned checkout used by this project:
+
+```bash
+python tools/bootstrap_relay.py
+python -m pytest tests -q
+```
+
+The bootstrap script checks out Relay-BP commit
+`19d7023d476248858fc01bdf087ce673feaa4ef4` under ignored `build/relay` and
+verifies the expected Stim fixture hashes before tests or image regeneration
+use it.
+
+GitHub Actions runs Python 3.11/3.12 tests, the pinned-fixture contract, Icarus
+RTL recovery simulation, and Verilator lint. Gowin place-and-route and the
+large-shot endpoint proof remain hardware operations; CI is not presented as a
+substitute for board evidence.
+
+### Board build and proof
+
+Requirements: Windows 11, Python 3.11+, Gowin EDA, WSL2 with GCC/OpenMP, a
+Tang Nano 20K, and the packages in `requirements.txt`.
+
+Set a non-default Gowin installation path if needed:
 
 ```powershell
 $env:GOWIN_HOME = 'C:\Gowin\Gowin_V1.9.11.03_Education_x64'
 ```
 
-Build and program volatile SRAM:
+Bootstrap the pinned Relay fixture, build, and program volatile SRAM:
 
 ```powershell
+python tools\bootstrap_relay.py
 powershell -ExecutionPolicy Bypass -File tools\build_board.ps1 -Basis X
 powershell -ExecutionPolicy Bypass -File tools\flash_gowin.ps1 -Basis X -Mode sram
 ```
 
-Run smoke or proof:
+Run smoke or a full proof campaign:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\run_board_proof.ps1 `
@@ -228,31 +290,20 @@ powershell -ExecutionPolicy Bypass -File tools\run_board_proof.ps1 `
   -Port COM6 -Basis X -Shots 300000
 ```
 
-SPI flash requires explicit `-Mode flash`. The flash script accepts only the
-exact basis-specific production bitstream by default.
+Repeat for basis `Z`. SPI flash requires explicit `-Mode flash`; the flash
+wrapper accepts only the exact basis-specific production bitstream by default.
 
-## Verification
+Generated Gowin projects, ROMs, bitstreams, raw captures, and benchmark output
+live under ignored `build/`. The repository tracks compact machine-readable
+release evidence in [`reports/release_evidence.json`](reports/release_evidence.json)
+instead of committing the large raw campaign files.
 
-```powershell
-python -m pytest tests -q
-python tools/run_iverilog.py --output build\sim\paper_s1w_uart.vvp `
-  --top tb_tang_nano_20k_paper_s1w_four_lane_uart_top `
-  --filelist tools\rtl_s1w_four_lane_uart_top.f
-verilator --lint-only --language 1800 -DMITTEN_SIM `
-  --top-module tang_nano_20k_paper_s1w_four_lane_uart_fast_51_top `
-  -f tools\rtl_s1w_four_lane_uart_top.f
-python tools/profile_c_tail.py --basis both --shots 1000 `
-  --set-iterations 50 --output build\c_tail_profile.json
-```
+## References and attribution
 
-Current focused validation: `74 passed, 12 subtests passed`; forced RTL error
-recovery passes. The authoritative board evidence and failure audit are
-in
-[`reports/HEADLINE_BENCHMARKS.md`](reports/HEADLINE_BENCHMARKS.md).
+MITTEN builds on public work on bivariate-bicycle qLDPC codes and Relay-BP.
+See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the pinned Relay-BP
+fixture, papers, public Gross-code reference, and license/provenance notes.
 
-Generated projects, ROMs, bitstreams, and benchmark JSON live under ignored
-`build/` and are intentionally not checked in. The repository keeps the small
-frozen S1 inputs and a legacy simulation image payload; the production build
-uses a portable payload only when its source hash matches, otherwise it
-requires the pinned Relay fixture. Stale images are rejected.
-Exploratory fixtures, task logs, and generated captures were removed.
+## License
+
+MITTEN is released under the Apache License 2.0. See [`LICENSE`](LICENSE).

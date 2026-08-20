@@ -1,4 +1,4 @@
-# Optional developer/test dependencies. Foundation tests use Python stdlib only.
+# Reproducible development/test dependencies. Some fixture-backed tests also require build/relay.
 pytest==8.3.5
 cocotb==1.9.2
 pyserial==3.5

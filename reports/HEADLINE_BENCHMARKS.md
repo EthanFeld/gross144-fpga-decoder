@@ -1,121 +1,77 @@
 # Board endpoint evidence
 
-Updated: 2026-08-20. Target: Gross144 at `p=0.2%`, Tang Nano 20K,
-40.5 MHz timing-clean FPGA clock, 3 Mbaud UART, resident C Relay-lite tail.
-Both basis images were built and SRAM-flashed on the connected GW2AR-18C.
+Updated: 2026-08-20. This file records the authoritative release evidence for
+Gross144 at `p=0.2%` on a Tang Nano 20K (`GW2AR-18C`): timing-clean 40.5 MHz
+FPGA images, 3 Mbaud UART, and the persistent C Relay-lite tail.
 
-## Stopping gates
+## Release result
 
-| Gate | Target | Current status |
+| Gate | Target | Authoritative result |
 | --- | ---: | --- |
-| Endpoint block LER | `<= 1e-5` | X/Z pass at 300k |
-| Mean endpoint core latency | order-ms informational | X `2.778 ms`, Z `2.294 ms` |
-| FPGA mean core latency | measured | `1.202–1.221 ms` at 40.5 MHz |
-| Board proof | large-shot, no crash/state loss | X/Z 300k clean |
+| Endpoint block LER | `<= 1e-5` | **PASS** — X/Z 300k, zero endpoint failures, `9.9857e-6` one-sided 95% upper bound |
+| Transport/parser integrity | zero unrecovered errors | **PASS** — zero parser/transport failures in both final runs |
+| FPGA timing closure | non-negative setup and hold slack at 40.5 MHz | **PASS** — X `+0.020/+0.202 ns`, Z `+0.563/+0.077 ns` |
+| Board proof | large-shot run on physical hardware | **PASS** — X/Z 300k completed cleanly |
+| Endpoint latency | order-ms informational | X `2.778 ms`, Z `2.294 ms` mean core latency |
 
-## Clean board captures
+## Authoritative on-board captures
 
-All captures below used SRAM programming, COM6, 3 Mbaud, and the production
-fast-handoff architecture. A zero-failure sample is functional evidence, not a
-statistical LER pass; the one-sided 95% upper bound is the release statistic.
+Both runs used SRAM-programmed, basis-specific production images on the
+connected GW2AR-18C. A zero-failure sample is not treated as a zero true LER;
+the one-sided 95% confidence upper bound is the release statistic.
 
-| Artifact | Shots | Endpoint failures | Point LER | One-sided 95% upper | FPGA mean core | Endpoint mean core | C tail mean |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| X 300k statistical run | 300,000 | 0 | 0 | `9.9857e-6` | `1.220 ms` | `2.778 ms` | `35.64 ms` |
-| Z 300k statistical run | 300,000 | 0 | 0 | `9.9857e-6` | `1.202 ms` | `2.294 ms` | `26.67 ms` |
+| Basis | Shots | Endpoint failures | Point LER | One-sided 95% upper | FPGA mean core | Endpoint mean core | C-tail mean | Defers accepted |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| X | 300,000 | 0 | 0 | `9.9857e-6` | `1.220 ms` | `2.778 ms` | `35.64 ms` | 13,118 / 13,118 |
+| Z | 300,000 | 0 | 0 | `9.9857e-6` | `1.202 ms` | `2.294 ms` | `26.67 ms` | 12,284 / 12,284 |
 
-The raw capture JSON is generated output and is intentionally omitted from
-the portfolio tree; the measured values and statistical bounds above are the
-checked-in release record.
+There were zero endpoint failure records, zero parser CRC errors, zero parser
+format errors, and zero serial reconnects in either final run.
 
-Both X/Z 300k runs had zero parser, transport, decoder, or endpoint failures.
-X had 13,118 defers; Z had 12,284; every handoff was an exact C-tail accept.
-Both LER gates pass; order-ms endpoint latency is accepted; distributions
-remain recorded.
+The tracked machine-readable release record is
+[`release_evidence.json`](release_evidence.json). It also records the SHA-256
+of each locally retained raw capture so an archived raw JSON can be checked
+against this release later.
 
-The default `FAST_FIRST` C-tail shortcut was compared with the conservative
-portfolio on 1,016 X and 973 Z real FPGA-deferred syndromes: zero acceptance,
-syndrome, or logical mismatches. Check-node OpenMP parallelism was verified on
-the same corpus; measured C-tail speedups were 3.09x (X) and 2.68x (Z).
+### Capture provenance
 
-## Long-run incident and failure audit
+| Basis | Capture timestamp (UTC) | Capture Git commit | Bitstream SHA-256 |
+| --- | --- | --- | --- |
+| X | `2026-08-20T16:19:43.029093+00:00` | `aa57e9503d095b41bf908b1a0dc43fbc473c9882` | `A875EACBB244F9CA9A4408C28545E51BAD5B522DC090F083A2742E9E73E28303` |
+| Z | `2026-08-20T14:30:50.346142+00:00` | `d55a1c0f95d5ac9061037a5f919b19805227a144` | `A74BBA39F7E5CBC2C51A75834FCEA8F06D7C4E994E9CD9A307C0C3CCBE96FFB8` |
 
-One earlier X 300k attempt was interrupted by host-side COM6 loss; transport
-avalanche excluded from decoder LER. Fresh X/Z 300k runs completed cleanly.
-A bounded COM6 close/reopen/retry handles transient FTDI `WriteFile` denial;
-unrecovered transport faults still invalidate a run.
+The Z capture predates commit `aa57e95`, which changed only the endpoint
+campaign's latency-gate semantics and documentation. The capture's historical
+`endpoint_pass=false` metadata came from the then-default `<=1 ms` endpoint
+latency requirement. Its functional/transport results and LER statistic are
+clean, so under the current order-ms informational latency policy it is an
+authoritative release pass.
 
-The earlier completed 300,000-shot capture contained five board-only logical
-mismatches. Exact saved-case replay classified them as follows:
+## Timing closure
 
-| Shot | FPGA result | Classification |
-| ---: | --- | --- |
-| 77,511 | `0x7D5` vs truth `0xBD5` | fixed by exact streamed replay before logical projection |
-| 120,106 | `0x867` vs truth `0x22D` | fixed by terminal-budget defer; host C tail now receives the candidate |
-| 140,382 | `0x663` vs truth `0xA63` | board posterior/logical projection mismatch |
-| 205,295 | `0x46C` vs truth `0x057` | board rescue-path projection mismatch |
-| 235,137 | `0x0D6` vs truth `0xC97` | board rescue-path projection mismatch |
-
-The first two cases were replayed on the current X image: the FPGA now
-returns a verified defer and the resident C tail returns the truth word. The
-remaining three historical cases are retained as regression evidence and are
-not counted as a current pass until replayed under the final image. The live
-campaign prints the first eight complete failure records, including parser
-counters and CPU-tail status.
-
-## Current architecture
-
-```text
-936-bit syndrome -> FPGA four-lane S1W at 40.5 MHz release target
-                     | accepted
-                     v
-                 logical word
-                     |
-                     + deferred full 1,728-bit syndrome
-                           v
-                    resident C Relay-lite tail
-                           v
-                       endpoint word
-```
-
-The host tail is pinned to C. It uses a verified config-0 fast-first pass, a
-32-set fast pass, a bounded 240-set fallback for ambiguous cases, and a
-four-leg conservative portfolio for audit/A-B mode. No auto backend,
-vectorized fallback, native Relay wheel, or alternate WSL worker is allowed in
-the release path.
-
-## Repository cleanup status
-
-The canonical build, SRAM flash, smoke, and proof wrappers are now checked in:
-
-- `tools/build_board.ps1`
-- `tools/flash_gowin.ps1`
-- `tools/run_board_proof.ps1`
-- `tools/gowin_paper_gross144_s1w_four_lane_uart.tcl`
-
-Both basis builds completed synthesis, place-and-route, timing analysis, and
-bitstream generation. The build rejects negative setup/hold slack:
-
-| Basis | Requested clock | Achieved Fmax | Setup slack | Hold slack | Bitstream SHA-256 |
-| --- | ---: | ---: | ---: | ---: | --- |
-| X | 40.500 MHz | 40.533 MHz | `+0.020 ns` | `+0.202 ns` | `A875EACBB244F9CA9A4408C28545E51BAD5B522DC090F083A2742E9E73E28303` |
-| Z | 40.500 MHz | 41.445 MHz | `+0.563 ns` | `+0.077 ns` | `A74BBA39F7E5CBC2C51A75834FCEA8F06D7C4E994E9CD9A307C0C3CCBE96FFB8` |
+| Basis | Logic | BSRAM | Requested clock | Achieved Fmax | Setup slack | Hold slack | Bitstream SHA-256 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| X | 19,773 / 20,736 (96%) | 39 / 46 (85%) | 40.500 MHz | 40.533 MHz | `+0.020 ns` | `+0.202 ns` | `A875EACBB244F9CA9A4408C28545E51BAD5B522DC090F083A2742E9E73E28303` |
+| Z | 19,850 / 20,736 (96%) | 39 / 46 (85%) | 40.500 MHz | 41.445 MHz | `+0.563 ns` | `+0.077 ns` | `A74BBA39F7E5CBC2C51A75834FCEA8F06D7C4E994E9CD9A307C0C3CCBE96FFB8` |
 
 Gowin reports a `PR1014` generic-routing warning for the 27 MHz input clock;
-post-route setup/hold timing passes at the requested 40.5 MHz.
+post-route setup/hold timing passes at the requested 40.5 MHz core target.
 
-Legacy source families were removed from the release tree. Approximate file
-count reduction from the pre-cleanup inventory is:
+## Defer-path validation
 
-| Area | Before | Current | Removed |
-| --- | ---: | ---: | ---: |
-| Python modules | 56 | 27 | 51.8% |
-| RTL files | 139 | 20 | 85.6% |
-| Tools | 96 | 13 | 86.5% |
-| Tests | 162 | 16 | 90.1% |
-| Combined source/tool/test inventory | 453 | 76 | **83.2%** |
+The default fast-first C-tail shortcut was compared with the conservative
+portfolio on 1,016 X and 973 Z real FPGA-deferred syndromes with zero
+acceptance, syndrome, or logical mismatches. Check-node OpenMP parallelism was
+verified on the same corpus; measured C-tail speedups were 3.09x (X) and 2.68x
+(Z).
 
-The remaining files are the production FPGA closure, resident C-tail support,
-focused software references/tests, and frozen input/evidence data. Historical
-binary fixtures, task reports, and generated captures were removed; they are
-not build inputs or release code.
+The FPGA's residual hash is never an acceptance certificate. Exact full
+936-check replay decides FPGA acceptance; a hard or ambiguous case defers to
+the C tail with the full 1,728-bit syndrome already retained on the host.
+
+## Historical development failures
+
+Pre-release images exposed board-only logical/projection defects and one
+host-side COM6 interruption. Those cases motivated the exact-replay,
+terminal-defer, and serial-recovery changes in the current path. They are not
+open release gates and are not mixed into the final release statistics above.

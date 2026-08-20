@@ -16,3 +16,8 @@ impl/
 *.vcd
 *.fst
 *.o
+*.egg-info/
+dist/
+.coverage
+coverage.xml
+.DS_Store

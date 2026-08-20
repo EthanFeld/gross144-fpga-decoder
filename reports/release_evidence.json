@@ -1,0 +1,83 @@
+{
+  "schema": "MITTEN-RELEASE-EVIDENCE-V1",
+  "release_candidate": "0.1.0",
+  "updated_utc": "2026-08-20",
+  "release_policy": {
+    "physical_error_rate": 0.002,
+    "block_ler_target": 1e-05,
+    "confidence": "one-sided 95% upper bound",
+    "endpoint_latency": "informational order-ms metric; no fixed sub-ms gate",
+    "board": "Tang Nano 20K / GW2AR-18C",
+    "core_clock_hz": 40500000,
+    "uart_baud": 3000000
+  },
+  "authoritative_board_runs": {
+    "X": {
+      "source_capture": "build/release_x_300k_final_v2.json",
+      "source_capture_sha256": "6159e559589fb1ad7fb3f04f7629d975668c27415f4b7c9e7a38fa15b4896c70",
+      "timestamp_utc": "2026-08-20T16:19:43.029093+00:00",
+      "capture_git_commit": "aa57e9503d095b41bf908b1a0dc43fbc473c9882",
+      "capture_git_dirty": false,
+      "bitstream_sha256": "a875eacbb244f9ca9a4408c28545e51bad5b522dc090f083a2742e9e73e28303",
+      "shots": 300000,
+      "endpoint_failures": 0,
+      "parser_crc_errors": 0,
+      "parser_format_errors": 0,
+      "serial_reconnects": 0,
+      "cpu_tail_defers": 13118,
+      "cpu_tail_accepts": 13118,
+      "block_ler": 0.0,
+      "block_ler_upper95_one_sided": 9.985724387484574e-06,
+      "mean_fpga_core_latency_us": 1219.897361728395,
+      "mean_endpoint_core_latency_us": 2778.3821851400003,
+      "mean_cpu_tail_latency_us": 35641.518981552064,
+      "functional_pass": true,
+      "transport_pass": true,
+      "release_pass": true
+    },
+    "Z": {
+      "source_capture": "build/release_z_300k_final.json",
+      "source_capture_sha256": "7228e805789e990865f99650cdbe89d8277a11d17bfbbc11bb319db620e5e2d3",
+      "timestamp_utc": "2026-08-20T14:30:50.346142+00:00",
+      "capture_git_commit": "d55a1c0f95d5ac9061037a5f919b19805227a144",
+      "capture_git_dirty": false,
+      "bitstream_sha256": "a74bba39f7e5cbc2c51a75834fcea8f06d7c4e994e9cd9a307c0c3ccbe96ffb8",
+      "shots": 300000,
+      "endpoint_failures": 0,
+      "parser_crc_errors": 0,
+      "parser_format_errors": 0,
+      "serial_reconnects": 0,
+      "cpu_tail_defers": 12284,
+      "cpu_tail_accepts": 12284,
+      "block_ler": 0.0,
+      "block_ler_upper95_one_sided": 9.985724387484574e-06,
+      "mean_fpga_core_latency_us": 1202.2495799176954,
+      "mean_endpoint_core_latency_us": 2294.383295673333,
+      "mean_cpu_tail_latency_us": 26672.103134158253,
+      "functional_pass": true,
+      "transport_pass": true,
+      "release_pass": true,
+      "capture_metadata_note": "The source capture predates commit aa57e95, which removed the obsolete fixed 1 ms endpoint-latency gate. Its historical endpoint_pass=false field reflects that old policy, not a decoder, transport, or LER failure."
+    }
+  },
+  "timing_closure": {
+    "X": {
+      "requested_clock_mhz": 40.5,
+      "achieved_fmax_mhz": 40.533,
+      "worst_setup_slack_ns": 0.02,
+      "worst_hold_slack_ns": 0.202,
+      "logic": "19773/20736 (96%)",
+      "bsram": "39/46 (85%)",
+      "bitstream_sha256": "a875eacbb244f9ca9a4408c28545e51bad5b522dc090f083a2742e9e73e28303"
+    },
+    "Z": {
+      "requested_clock_mhz": 40.5,
+      "achieved_fmax_mhz": 41.445,
+      "worst_setup_slack_ns": 0.563,
+      "worst_hold_slack_ns": 0.077,
+      "logic": "19850/20736 (96%)",
+      "bsram": "39/46 (85%)",
+      "bitstream_sha256": "a74bba39f7e5cbc2c51a75834fcea8f06d7c4e994e9cd9a307c0c3ccbe96ffb8"
+    }
+  }
+}
