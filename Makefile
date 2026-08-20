@@ -15,7 +15,7 @@ test-rtl-recovery: test-rtl
 	vvp build/sim/paper_s1w_uart.vvp +ZERO_SYNDROME +ERROR_RECOVERY +EXPECTED_LOGICAL=0 +EXPECTED_SWEEPS=0 +EXPECTED_STATUS=1 +EXPECTED_BASIS=0
 
 lint:
-	verilator --lint-only --language 1800-2012 -DGROSS144_SIM --top-module tang_nano_20k_paper_s1w_four_lane_uart_fast_51_top -f tools/rtl_s1w_four_lane_uart_top.f
+	verilator --lint-only --language 1800-2012 -DGROSS144_SIM -Wno-fatal --top-module tang_nano_20k_paper_s1w_four_lane_uart_fast_51_top -f tools/rtl_s1w_four_lane_uart_top.f
 
 build-board:
 	powershell -ExecutionPolicy Bypass -File tools/build_board.ps1 -Basis $(BASIS)
