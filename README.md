@@ -122,11 +122,9 @@ and the generated ROM contract is recorded in
 
 ### Compression ledger
 
-The reductions below are measured against the direct Paper Gross144 Stage-1
-representation. They apply to different resources, so the factors must not be
-multiplied together into one headline number. The audited end-to-end topology
-factor is **44.3x**; the other entries describe transport, state, or execution
-reductions around that representation.
+The reductions below are measured against the naive implementation of the original
+algorithim. This is more of a listing of techniques rather than a pipeline so the numbers
+generally don't multiply.
 
 | Technique | Before | After | Factor / effect | What changes |
 | --- | ---: | ---: | ---: | --- |
