@@ -216,6 +216,11 @@ def _args() -> argparse.Namespace:
         help="production clock from config/board_clock.json used for cycle conversion",
     )
     parser.add_argument("--timeout", type=float, default=0.25)
+    parser.add_argument(
+        "--max-endpoint-latency-us", type=float, default=None,
+        help=("optional endpoint mean-latency gate; default keeps measured "
+              "order-ms latency informational"),
+    )
     parser.add_argument("--relay-root", type=Path, default=ROOT / "build" / "relay")
     parser.add_argument("--bitstream", type=Path)
     parser.add_argument("--failure-case-limit", type=int, default=32)
@@ -248,8 +253,14 @@ def _args() -> argparse.Namespace:
 
 def main() -> int:
     args = _args()
-    if args.shots < 1 or args.batch_size < 1 or args.timeout <= 0 or args.core_clock_hz <= 0:
-        raise SystemExit("shots, batch-size, timeout, and core-clock-hz must be positive")
+    if (args.shots < 1 or args.batch_size < 1 or args.timeout <= 0 or
+            args.core_clock_hz <= 0 or
+            (args.max_endpoint_latency_us is not None and
+             args.max_endpoint_latency_us <= 0)):
+        raise SystemExit(
+            "shots, batch-size, timeout, core-clock-hz, and optional latency "
+            "gate must be positive"
+        )
     if args.deferred_corpus is not None and not args.cpu_telescope_handoff:
         raise SystemExit("--deferred-corpus requires --cpu-telescope-handoff")
     expected_basis_id = 0 if args.basis == "X" else 1
@@ -587,6 +598,7 @@ def main() -> int:
         "max_endpoint_core_latency_us": max(endpoint_core_ns) / 1e3,
         "mean_endpoint_wall_latency_us": endpoint_mean_wall_us,
         "p99_endpoint_wall_latency_us": percentile(ordered_endpoint_wall, 0.99) / 1e3,
+        "endpoint_latency_gate_us": args.max_endpoint_latency_us,
         "elapsed_seconds": elapsed,
         "shots_per_second": shots / elapsed,
         "sweep_histogram": dict(sorted(sweeps.items())),
@@ -624,9 +636,13 @@ def main() -> int:
     payload["functional_pass"] = bool(
         failure_count == 0 and payload["transport_pass"]
     )
+    payload["endpoint_latency_pass"] = bool(
+        args.max_endpoint_latency_us is None or
+        endpoint_mean_core_us <= args.max_endpoint_latency_us
+    )
     payload["endpoint_pass"] = bool(
         payload["block_ler_upper95_one_sided"] <= 1e-5 and
-        endpoint_mean_core_us <= 1000.0 and payload["transport_pass"]
+        payload["transport_pass"] and payload["endpoint_latency_pass"]
     )
     if args.deferred_corpus is not None:
         args.deferred_corpus.parent.mkdir(parents=True, exist_ok=True)

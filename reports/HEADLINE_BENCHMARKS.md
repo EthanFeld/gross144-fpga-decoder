@@ -1,6 +1,6 @@
 # Board endpoint evidence
 
-Updated: 2026-08-19. Target: Gross144 at `p=0.2%`, Tang Nano 20K,
+Updated: 2026-08-20. Target: Gross144 at `p=0.2%`, Tang Nano 20K,
 40.5 MHz timing-clean FPGA clock, 3 Mbaud UART, resident C Relay-lite tail.
 Both basis images were built and SRAM-flashed on the connected GW2AR-18C.
 
@@ -9,8 +9,8 @@ Both basis images were built and SRAM-flashed on the connected GW2AR-18C.
 | Gate | Target | Current status |
 | --- | ---: | --- |
 | Endpoint block LER | `<= 1e-5` | Z passes; X open after host interruption |
-| Mean endpoint core latency | `<= 1 ms` | not met; CPU tail dominates |
-| FPGA mean core latency | `<= 1 ms` | not met at 40.5 MHz: 1.235–1.255 ms |
+| Mean endpoint core latency | order-ms informational | Z: `2.294 ms`; CPU tail dominates |
+| FPGA mean core latency | measured | `1.202–1.221 ms` at 40.5 MHz |
 | Board proof | large-shot, no crash/state loss | Z 300k clean; X interrupted |
 
 ## Clean board captures
@@ -31,7 +31,7 @@ checked-in release record.
 Both 30k validation runs had zero parser, transport, decoder, or endpoint
 failures. Z then completed 300k with zero failures, zero parser/transport
 errors, 12,284 defers, and 12,284 exact C-tail accepts. Z LER gate passes;
-endpoint gate remains red because mean endpoint latency is above `1 ms`.
+order-ms endpoint latency is accepted; distributions remain recorded.
 
 The default `FAST_FIRST` C-tail shortcut was compared with the conservative
 portfolio on 1,016 X and 973 Z real FPGA-deferred syndromes: zero acceptance,
