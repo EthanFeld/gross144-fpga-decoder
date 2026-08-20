@@ -15,10 +15,10 @@ RELAY_URL = "https://github.com/trmue/relay.git"
 RELAY_COMMIT = "19d7023d476248858fc01bdf087ce673feaa4ef4"
 FIXTURE_DIR = Path("tests/testdata/bicycle_bivariate")
 EXPECTED = {
-    ("0.001", "X"): "0d836686deaaf6169cbab132f185c1202bb6e00c7f9637d7cade878375fd4d85",
-    ("0.001", "Z"): "c1074cb8ee82fa9a4dc009f880180d6e1d7bb7fa76ed1d1a2a51f33dc9a6cb5b",
-    ("0.002", "X"): "70a8fac201a54ea244595f99e4fa9a35d561cac620b91df8dfbeaaeed3fadf06",
-    ("0.002", "Z"): "ba31f0a382c7abf9c98fbed04eb9c4423b48e0ca86107dbe4b9de53ebd760732",
+    ("0.001", "X"): "a354a0bff24ac02d0f37bc63f28072063da2592c6115d8b900728b4789d0c06b",
+    ("0.001", "Z"): "97ed68e3859e10ebdfd0a13c5c6abd623084ee1bd11d88287af6a67abfdd24f2",
+    ("0.002", "X"): "15f35444a771bb6bf0008c21a94f5431ef60951037f23d6d2b09b88631fdb748",
+    ("0.002", "Z"): "d935f128b5ea8d225f7ba523f7dab4561580e2cc6ab95942c6d15245892f5cde",
 }
 
 
@@ -31,11 +31,10 @@ def run(*args: str, cwd: Path | None = None) -> str:
 
 
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    """Hash fixture text canonically so Windows and Linux checkouts agree."""
+
+    canonical = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def fixture_path(relay_root: Path, p: str, basis: str) -> Path:
