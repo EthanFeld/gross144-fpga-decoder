@@ -1,17 +1,18 @@
 # Gross144 FPGA Decoder
 
-Resource-constrained FPGA decoding for the Gross `[[144,12,12]]` qLDPC
+Cheap FPGA decoding for the Gross `[[144,12,12]]` qLDPC
 memory.
 
 This repository implements the common decoding path for the Gross
-bivariate-bicycle code on a Tang Nano 20K (`GW2AR-18C`). It compresses the
-Paper Gross144 Stage-1 topology by **44.3x**, executes check updates across
+bivariate-bicycle code on a Tang Nano 20K (`GW2AR-18C`). It implements a highly 
+compressed version of min-sum belief propagation, executes check updates across
 four banked FPGA lanes, verifies accepted candidates by exact syndrome replay,
 and routes terminal defers to a persistent C Relay-lite tail on the host.
 
-X and Z use separate basis-specific FPGA images. The release target is
-`p=0.2%`, block LER `<=1e-5`, with endpoint latency reported at order-ms scale.
 
+This is heavily inspired by the telescoping decoder used in the Mitten codes paper (Arxiv:2607.28795)
+
+All data is done on a basic 0.2% uniform error rate model.
 ## At a glance
 
 | Item | X | Z |
@@ -29,7 +30,7 @@ X and Z use separate basis-specific FPGA images. The release target is
 | Logic | 19,773 / 20,736 (`96%`) | 19,850 / 20,736 (`96%`) |
 | BSRAM | 39 / 46 (`85%`) | 39 / 46 (`85%`) |
 
-The authoritative 300k campaigns are recorded in
+The 300k runs are in
 [`reports/release_evidence.json`](reports/release_evidence.json), including
 capture provenance, bitstream hashes, timing data, defer counts, and the LER
 confidence bound.
@@ -169,41 +170,7 @@ Complete hashes and capture provenance are in
 source/top identifiers containing `_51` are retained for Gowin compatibility;
 the production clock is 40.5 MHz.
 
-## Harness throughput status
 
-The board campaign harness now batches Stim sampling, vectorizes syndrome and
-observable packing, uses nonblocking VCP reads, and optionally opens the FTDI
-D2XX transport directly with `--transport d2xx`.
-
-A 256-shot run on the attached board measured:
-
-| Metric | Result |
-| --- | ---: |
-| Throughput | `58.85 shots/s` |
-| Mean FPGA core | `1.228 ms` |
-| Mean wall time | `16.945 ms` |
-| P99 wall time | `17.727 ms` |
-| UART response | 11-byte compact result |
-
-Host packing is approximately 3 microseconds per shot. The remaining gap to
-hundreds of shots/s is the FT2232C/Windows first-response delay of roughly
-15–16 ms, not the sampler, packer, or decoder core. Reaching hundreds/s needs a
-buffered multi-shot FPGA protocol or a different USB transport; the current
-board is already at approximately 96% logic and 99% CLS utilization.
-
-## Stage-2 architecture work
-
-Stage-2 work remains in the software/model path and is not claimed as resident
-on the current board:
-
-- streamed Stage-2 quotient with approximately 58.2x topology compression;
-- packed seven-bit S2R message layouts;
-- bounded logical-neutral component completion;
-- software/SDRAM bandwidth models and integration experiments.
-
-The X streamed quotient uses 942 variable orbits, keeps at most 9,432 live
-posterior variables, and retires decisions into a one-bit correction bitmap.
-The packed S2R message layout reduces the modeled X dynamic layout by 37.1%.
 
 ## Repository layout
 
