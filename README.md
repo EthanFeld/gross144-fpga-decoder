@@ -15,24 +15,25 @@ Target: `p = 0.2%`, block LER `<= 1e-5`, mean endpoint latency `<= 1 ms`.
 | Board capture | Shots | Endpoint failures | Point LER | One-sided 95% upper bound | FPGA mean | Endpoint mean | C tail mean |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | X release candidate | 30,000 | 0 | 0 | `9.9853e-5` | `1.221 ms` | `2.687 ms` | `34.24 ms` |
-| Z release candidate | 30,000 | 0 | 0 | `9.9853e-5` | `1.205 ms` | `2.574 ms` | `32.17 ms` |
+| Z 300k statistical run | 300,000 | 0 | 0 | `9.9857e-6` | `1.202 ms` | `2.294 ms` | `26.67 ms` |
 
 These runs are functional evidence, not an LER pass: their statistical upper
 bound is still above `1e-5`. Endpoint latency is dominated by the CPU tail.
-Both 30,000-shot runs were clean: no endpoint, transport, parser, or decoder
-errors; all 2,562 FPGA defers were accepted by the C tail.
+Both 30,000-shot validation runs were clean. Z then completed 300,000 shots
+with no endpoint, transport, parser, or decoder errors; all 12,284 Z defers
+were accepted by the C tail.
 
 Paper comparison numbers supplied for this target:
 
 | Metric | Paper reference | Current board evidence |
 | --- | ---: | ---: |
-| Block LER | `1.9e-6` | `<= 9.9853e-5` upper bound at 30k/basis |
+| Block LER | `1.9e-6` | Z: `<= 9.9857e-6` at 300k; X: `<= 9.9853e-5` at 30k |
 | LER / syndrome-extraction round | `1.6e-7` | not established on board |
 | LER / round / logical qubit | `1.3e-8` | not established on board |
 
-The 300,000-shot proof remains open. Do not present the current sample as
-paper-scale LER proof. The endpoint latency gate also remains open because
-the resident CPU tail raises the mean above 1 ms.
+Z meets statistical LER target at 300,000 shots. X 300,000 proof remains open
+after host-side COM6 interruption. Endpoint latency gate remains open because
+resident CPU tail raises mean above 1 ms.
 
 ## Build status
 

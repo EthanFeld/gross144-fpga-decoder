@@ -8,10 +8,10 @@ Both basis images were built and SRAM-flashed on the connected GW2AR-18C.
 
 | Gate | Target | Current status |
 | --- | ---: | --- |
-| Endpoint block LER | `<= 1e-5` | not proven; 30k upper bound `9.9853e-5` |
+| Endpoint block LER | `<= 1e-5` | Z passes; X open after host interruption |
 | Mean endpoint core latency | `<= 1 ms` | not met; CPU tail dominates |
 | FPGA mean core latency | `<= 1 ms` | not met at 40.5 MHz: 1.235–1.255 ms |
-| Board proof | large-shot, no crash/state loss | 30k/basis clean; 300k open |
+| Board proof | large-shot, no crash/state loss | Z 300k clean; X interrupted |
 
 ## Clean board captures
 
@@ -22,16 +22,16 @@ statistical LER pass; the one-sided 95% upper bound is the release statistic.
 | Artifact | Shots | Endpoint failures | Point LER | One-sided 95% upper | FPGA mean core | Endpoint mean core | C tail mean |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | X release candidate | 30,000 | 0 | 0 | `9.9853e-5` | `1.221 ms` | `2.687 ms` | `34.24 ms` |
-| Z release candidate | 30,000 | 0 | 0 | `9.9853e-5` | `1.205 ms` | `2.574 ms` | `32.17 ms` |
+| Z 300k statistical run | 300,000 | 0 | 0 | `9.9857e-6` | `1.202 ms` | `2.294 ms` | `26.67 ms` |
 
 The raw capture JSON is generated output and is intentionally omitted from
 the portfolio tree; the measured values and statistical bounds above are the
 checked-in release record.
 
-Both runs had zero parser, transport, decoder, or endpoint failures. There
-were 1,285 X and 1,277 Z FPGA defers; every C-tail handoff was accepted with
-an exact syndrome. The endpoint gate remains red because the confidence bound
-is above `1e-5` and mean endpoint latency is above `1 ms`.
+Both 30k validation runs had zero parser, transport, decoder, or endpoint
+failures. Z then completed 300k with zero failures, zero parser/transport
+errors, 12,284 defers, and 12,284 exact C-tail accepts. Z LER gate passes;
+endpoint gate remains red because mean endpoint latency is above `1 ms`.
 
 The default `FAST_FIRST` C-tail shortcut was compared with the conservative
 portfolio on 1,016 X and 973 Z real FPGA-deferred syndromes: zero acceptance,
@@ -40,10 +40,10 @@ the same corpus; measured C-tail speedups were 3.09x (X) and 2.68x (Z).
 
 ## Long-run incident and failure audit
 
-The prior 300,000-shot attempts entered a repeatable cascade after a long
-clean prefix. A bounded COM6 close/reopen/retry now handles transient FTDI
-`WriteFile` denial; unrecovered transport faults still invalidate a run. No
-300,000-shot JSON is currently valid proof.
+X 300k attempt was interrupted by host-side COM6 loss; transport avalanche is
+excluded from decoder LER. Z 300k completed cleanly. A bounded COM6
+close/reopen/retry handles transient FTDI `WriteFile` denial; unrecovered
+transport faults still invalidate a run.
 
 The earlier completed 300,000-shot capture contained five board-only logical
 mismatches. Exact saved-case replay classified them as follows:
